@@ -88,6 +88,43 @@ function parseCards(raw: unknown): WalletCard[] {
     .filter((card): card is WalletCard => card !== null)
 }
 
+function getSupabaseErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "message" in err) {
+    const message = String((err as { message: string }).message)
+    const hint =
+      "hint" in err && (err as { hint?: string }).hint
+        ? ` (${(err as { hint: string }).hint})`
+        : ""
+    return `${message}${hint}`
+  }
+  return fallback
+}
+
+async function ensureProfile(userId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  if (data) {
+    return
+  }
+
+  const { error: insertError } = await supabase.from("profiles").insert({
+    id: userId,
+    cards: [],
+  })
+
+  if (insertError && insertError.code !== "23505") {
+    throw insertError
+  }
+}
+
 export function WalletView() {
   const { user, loading: authLoading } = useAuth()
   const [cards, setCards] = useState<WalletCard[]>([])
@@ -105,6 +142,8 @@ export function WalletView() {
     setLoading(true)
 
     try {
+      await ensureProfile(user.id)
+
       const { data, error } = await supabase
         .from("profiles")
         .select("cards")
@@ -115,8 +154,10 @@ export function WalletView() {
 
       setCards(parseCards(data?.cards ?? []))
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load wallet cards."
+      const message = getSupabaseErrorMessage(
+        err,
+        "Failed to load wallet cards."
+      )
       toast.error("Could not load wallet", { description: message })
       setCards([])
     } finally {
@@ -140,40 +181,29 @@ export function WalletView() {
     setSaving(true)
 
     try {
-      const { data: existing, error: fetchError } = await supabase
+      await ensureProfile(user.id)
+
+      const { data, error } = await supabase
         .from("profiles")
-        .select("id")
-        .eq("id", user.id)
-        .maybeSingle()
-
-      if (fetchError) throw fetchError
-
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({
+        .upsert(
+          {
+            id: user.id,
             cards: nextCards,
             updated_at: new Date().toISOString(),
-          })
-          .eq("id", user.id)
+          },
+          { onConflict: "id" }
+        )
+        .select("cards")
+        .single()
 
-        if (updateError) throw updateError
-      } else {
-        const { error: insertError } = await supabase.from("profiles").insert({
-          id: user.id,
-          cards: nextCards,
-        })
+      if (error) throw error
 
-        if (insertError) throw insertError
-      }
-
-      setCards(nextCards)
+      setCards(parseCards(data?.cards ?? nextCards))
       toast.success("Wallet updated", {
         description: "Your card is now in the circle arsenal.",
       })
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to update wallet."
+      const message = getSupabaseErrorMessage(err, "Failed to update wallet.")
       toast.error("Save failed", { description: message })
       throw err
     } finally {

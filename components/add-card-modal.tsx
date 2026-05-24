@@ -190,14 +190,17 @@ export function AddCardModal({
       return
     }
 
-    await onAddToWallet({
-      card_id: selectedCard.card_id,
-      bank_name: selectedCard.bank_name,
-      card_name: selectedCard.card_name,
-      style_classes: selectedCard.style_classes,
-    })
-
-    onOpenChange(false)
+    try {
+      await onAddToWallet({
+        card_id: selectedCard.card_id,
+        bank_name: selectedCard.bank_name,
+        card_name: selectedCard.card_name,
+        style_classes: selectedCard.style_classes,
+      })
+      onOpenChange(false)
+    } catch {
+      // Save failed toast is shown in WalletView.updateWallet
+    }
   }
 
   return (
