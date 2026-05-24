@@ -8,8 +8,13 @@ import {
   type DealOffer,
   type DealSearchCategory,
   type DealSearchResult,
+  type MarketOffer,
   type WalletCardInput,
 } from "@/lib/deal-search"
+import {
+  fetchSerperDealContext,
+  type SerperDealContext,
+} from "@/lib/serper-client"
 
 type SearchRequestBody = {
   category?: string
@@ -28,6 +33,47 @@ type AiDealPayload = {
   estimated_price?: number | null
   offers?: DealOffer[]
   summary?: string
+}
+
+function buildMarketOffersFromSerper(serper: SerperDealContext): MarketOffer[] {
+  const fromOrganic = serper.card_offer_snippets.map((row) => ({
+    title: row.title,
+    snippet: row.snippet,
+    source: "Live web offer",
+    url: row.link,
+  }))
+
+  const fromShopping = serper.shopping_results.map((row) => ({
+    title: row.title,
+    snippet: row.price ? `Listed at ${row.price}` : "Shopping listing",
+    source: row.source || "Shopping",
+    url: row.link,
+  }))
+
+  return [...fromOrganic, ...fromShopping].slice(0, 8)
+}
+
+function buildDataSources(
+  hints: UrlHints,
+  serper: SerperDealContext,
+  usedAi: boolean
+): string[] {
+  const sources: string[] = []
+
+  if (hints.title || hints.price != null) {
+    sources.push("url_scrape")
+  }
+  if (serper.used_serper) {
+    sources.push("serper")
+  }
+  if (usedAi) {
+    sources.push("ai")
+  }
+  if (sources.length === 0) {
+    sources.push("rules")
+  }
+
+  return sources
 }
 
 function isValidHttpUrl(value: string): boolean {
@@ -130,14 +176,37 @@ function normalizeOffers(
   }))
 }
 
+function attachSerperMetadata(
+  result: DealSearchResult,
+  hints: UrlHints,
+  serper: SerperDealContext,
+  usedAi: boolean
+): DealSearchResult {
+  return {
+    ...result,
+    product_title:
+      result.product_title ||
+      serper.product_title ||
+      hints.title ||
+      "Linked purchase",
+    estimated_price:
+      result.estimated_price ?? serper.price ?? hints.price ?? null,
+    used_serper: serper.used_serper,
+    data_sources: buildDataSources(hints, serper, usedAi),
+    market_offers: buildMarketOffersFromSerper(serper),
+  }
+}
+
 function buildAiResult(
   category: DealSearchCategory,
   url: string,
   walletCards: WalletCardInput[],
   aiPayload: AiDealPayload,
-  hints: UrlHints
+  hints: UrlHints,
+  serper: SerperDealContext
 ): DealSearchResult {
-  const estimatedPrice = aiPayload.estimated_price ?? hints.price ?? null
+  const estimatedPrice =
+    aiPayload.estimated_price ?? serper.price ?? hints.price ?? null
   const offers = normalizeOffers(
     aiPayload.offers,
     walletCards,
@@ -147,8 +216,12 @@ function buildAiResult(
   )
   const bestOffer = offers.find((offer) => offer.recommended) ?? offers[0] ?? null
 
-  return {
-    product_title: aiPayload.product_title || hints.title || "Linked purchase",
+  const base: DealSearchResult = {
+    product_title:
+      aiPayload.product_title ||
+      serper.product_title ||
+      hints.title ||
+      "Linked purchase",
     platform: aiPayload.platform || detectPlatform(url),
     category,
     source_url: url,
@@ -161,7 +234,12 @@ function buildAiResult(
         ? `Best wallet pick: ${bestOffer.bank_name} ${bestOffer.card_name}.`
         : "No wallet cards to compare."),
     used_ai: true,
+    used_serper: serper.used_serper,
+    data_sources: buildDataSources(hints, serper, true),
+    market_offers: buildMarketOffersFromSerper(serper),
   }
+
+  return attachSerperMetadata(base, hints, serper, true)
 }
 
 export async function searchDealsForWallet(
@@ -169,14 +247,36 @@ export async function searchDealsForWallet(
   url: string,
   walletCards: WalletCardInput[]
 ): Promise<DealSearchResult> {
+  const platform = detectPlatform(url)
   const hints = await fetchUrlHints(url)
+
+  const serper = await fetchSerperDealContext({
+    url,
+    platform,
+    category,
+    walletCards,
+    existingTitle: hints.title,
+    existingPrice: hints.price ?? null,
+  })
+
+  const enrichedHints: UrlHints = {
+    title: hints.title || serper.product_title,
+    price: hints.price ?? serper.price ?? null,
+  }
 
   try {
     const aiRaw = await call_ai(DEAL_SEARCH_SYSTEM_PROMPT, {
       category,
       url,
-      pageHints: hints,
+      platform,
+      pageHints: enrichedHints,
       walletCards,
+      serperFindings: {
+        product_snippets: serper.product_snippets,
+        card_offer_snippets: serper.card_offer_snippets,
+        shopping_results: serper.shopping_results,
+        queries_run: serper.queries_run,
+      },
     })
 
     const aiPayload =
@@ -184,20 +284,27 @@ export async function searchDealsForWallet(
         ? (aiRaw as AiDealPayload)
         : (safeJsonExtract(String(aiRaw)) as AiDealPayload)
 
-    return buildAiResult(category, url, walletCards, aiPayload, hints)
+    return buildAiResult(
+      category,
+      url,
+      walletCards,
+      aiPayload,
+      enrichedHints,
+      serper
+    )
   } catch {
     const fallback = buildFallbackResult(
       category,
       url,
       walletCards,
-      hints.price ?? null
+      enrichedHints.price ?? null
     )
 
-    if (hints.title) {
-      fallback.product_title = hints.title
+    if (enrichedHints.title) {
+      fallback.product_title = enrichedHints.title
     }
 
-    return fallback
+    return attachSerperMetadata(fallback, enrichedHints, serper, false)
   }
 }
 

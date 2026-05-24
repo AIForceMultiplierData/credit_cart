@@ -27,6 +27,16 @@ export type DealSearchResult = {
   offers: DealOffer[]
   summary: string
   used_ai: boolean
+  used_serper: boolean
+  data_sources: string[]
+  market_offers: MarketOffer[]
+}
+
+export type MarketOffer = {
+  title: string
+  snippet: string
+  source: string
+  url?: string
 }
 
 const PLATFORM_RULES: Array<{
@@ -158,18 +168,24 @@ export function buildFallbackResult(
       ? `Use ${bestOffer.bank_name} ${bestOffer.card_name} for the strongest wallet match on ${platform}.`
       : "Add cards to your wallet to compare offers.",
     used_ai: false,
+    used_serper: false,
+    data_sources: ["rules"],
+    market_offers: [],
   }
 }
 
-export const DEAL_SEARCH_SYSTEM_PROMPT = `You are PoolPay, an Indian fintech deal optimizer.
-Given a purchase category, product = product or booking link, optional page hints, and ONLY the user's wallet credit cards, rank which card saves the most money.
+export const DEAL_SEARCH_SYSTEM_PROMPT = `You are PoolPay, an Indian fintech deal optimizer for India.
+Given a purchase category, product/booking URL, pageHints, serperFindings (live Google search snippets), and ONLY the user's wallet credit cards, rank which card saves the most money.
 
 Rules:
 - Only recommend cards present in walletCards. Never invent cards.
+- PRIORITIZE serperFindings.card_offer_snippets and serperFindings.shopping_results for live offer percentages when available.
+- Use pageHints and serperFindings.product_snippets for product_title and estimated_price when URL scraping is weak.
 - Use realistic Indian bank/card offers (cashback, instant discount, EMI, lounge/travel perks).
 - Prefer platform-native cards (e.g. ICICI Amazon Pay on Amazon, Axis Flipkart on Flipkart).
-- For flights/hotels, weigh travel rewards and OTA bank offers.
+- For flights/hotels, weigh travel rewards and OTA bank offers from serperFindings.
 - estimated_price may be null if unknown; still provide percentage guidance.
+- Cite specific offer details from serperFindings in each offer reason when possible.
 
 Return ONLY valid JSON:
 {

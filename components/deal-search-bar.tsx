@@ -241,8 +241,14 @@ export function DealSearchBar({
               </h3>
               <p className="text-xs text-slate-500">
                 {result.platform} · {result.category}
+                {result.used_serper ? " · Serper live" : ""}
                 {result.used_ai ? " · AI ranked" : " · rule-based estimate"}
               </p>
+              {result.data_sources.length > 0 ? (
+                <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-600">
+                  Sources: {result.data_sources.join(" + ")}
+                </p>
+              ) : null}
             </div>
             {result.estimated_price !== null ? (
               <div className="shrink-0 text-right">
@@ -276,6 +282,30 @@ export function DealSearchBar({
           ) : null}
 
           <p className="mb-3 text-sm text-slate-400">{result.summary}</p>
+
+          {result.market_offers.length > 0 ? (
+            <div className="mb-3 space-y-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-300">
+                Live offers found (Serper)
+              </p>
+              {result.market_offers.slice(0, 4).map((offer, index) => (
+                <div
+                  key={`${offer.title}-${index}`}
+                  className="border-t border-slate-800/60 pt-2 first:border-0 first:pt-0"
+                >
+                  <p className="text-xs font-medium text-slate-200">
+                    {offer.title}
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500">
+                    {offer.snippet}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-blue-400/80">
+                    {offer.source}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {result.offers.length > 1 ? (
             <div className="space-y-2 border-t border-slate-800/60 pt-3">
