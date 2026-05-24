@@ -45,7 +45,7 @@ function nextSerperKey(): string | null {
   return key ?? null
 }
 
-function parseInrPrice(raw: string | undefined): number | null {
+export function parseInrPrice(raw: string | undefined): number | null {
   if (!raw) return null
   const normalized = raw.replace(/,/g, "")
   const match = normalized.match(/(?:₹|Rs\.?\s*)?(\d+(?:\.\d+)?)/i)
@@ -317,4 +317,30 @@ export async function fetchSerperDealContext(input: {
       ...(shoppingSearch ? [input.existingTitle || productQuery] : []),
     ],
   }
+}
+
+export async function fetchSerperShopping(
+  query: string,
+  limit = 6
+): Promise<SerperShoppingResult[]> {
+  if (SERPER_API_KEYS.length === 0) return []
+
+  const response = await serperPost<SerperSearchResponse>(SERPER_SHOPPING_URL, {
+    q: query,
+  })
+
+  return (response?.shopping ?? []).slice(0, limit)
+}
+
+export async function fetchSerperPlatformCardOffers(
+  platform: string
+): Promise<SerperOrganicResult[]> {
+  if (SERPER_API_KEYS.length === 0) return []
+
+  const query = buildPlatformBestCardsQuery(platform, "product")
+  const response = await serperPost<SerperSearchResponse>(SERPER_SEARCH_URL, {
+    q: query,
+  })
+
+  return dedupeOrganic(response?.organic ?? []).slice(0, 12)
 }

@@ -1,8 +1,22 @@
 "use client"
 
-import { Zap, TrendingDown, Clock } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import {
+  Clock,
+  Loader2,
+  RefreshCw,
+  TrendingDown,
+  Users,
+  Zap,
+} from "lucide-react"
+import { useCardLead } from "@/components/card-lead-provider"
+import type { ViralDeal } from "@/lib/viral-deals"
+import { useAuth } from "@/hooks/useAuth"
+import { useDealSearchCards } from "@/hooks/useDealSearchCards"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 
+/** Kept for PingDrawer compatibility */
 export interface Deal {
   id: string
   title: string
@@ -13,155 +27,293 @@ export interface Deal {
   timeLeft: string
   image?: string
   isDemo?: boolean
+  platform?: string
+  productUrl?: string
+  cardId?: string
+  cardBankName?: string
+  cardFullName?: string
+  discountPercent?: number
+  styleClasses?: string
+  inCircle?: boolean
+  circleOwnerName?: string
+  splitHint?: string
+  serperBacked?: boolean
 }
 
-const mockDeals: Deal[] = [
-  {
-    id: "1",
-    title: "Apple MacBook Air M2",
-    originalPrice: 99999,
-    discountedPrice: 75000,
-    cardName: "HDFC",
-    cardDiscount: 5000,
-    timeLeft: "2h 30m",
-    isDemo: true,
-  },
-  {
-    id: "2",
-    title: "Sony WH-1000XM5 Headphones",
-    originalPrice: 29990,
-    discountedPrice: 22990,
-    cardName: "ICICI",
-    cardDiscount: 2000,
-    timeLeft: "4h 15m",
-    isDemo: true,
-  },
-  {
-    id: "3",
-    title: "iPhone 15 Pro Max 256GB",
-    originalPrice: 159900,
-    discountedPrice: 139900,
-    cardName: "SBI",
-    cardDiscount: 10000,
-    timeLeft: "1h 45m",
-    isDemo: true,
-  },
-  {
-    id: "4",
-    title: 'Samsung 65" OLED TV',
-    originalPrice: 189990,
-    discountedPrice: 159990,
-    cardName: "Axis",
-    cardDiscount: 15000,
-    timeLeft: "5h 00m",
-    isDemo: true,
-  },
-  {
-    id: "5",
-    title: "PlayStation 5 Console",
-    originalPrice: 54990,
-    discountedPrice: 44990,
-    cardName: "HDFC",
-    cardDiscount: 5000,
-    timeLeft: "3h 20m",
-    isDemo: true,
-  },
-]
+function viralDealToLegacyDeal(deal: ViralDeal): Deal {
+  return {
+    id: deal.id,
+    title: deal.title,
+    originalPrice: deal.originalPrice,
+    discountedPrice: deal.discountedPrice,
+    cardName: deal.cardBankName,
+    cardDiscount: deal.cardDiscount,
+    timeLeft: deal.platform,
+    isDemo: false,
+    platform: deal.platform,
+    productUrl: deal.productUrl,
+    cardId: deal.cardId,
+    cardBankName: deal.cardBankName,
+    cardFullName: deal.cardName,
+    discountPercent: deal.discountPercent,
+    styleClasses: deal.styleClasses,
+    inCircle: deal.inCircle,
+    circleOwnerName: deal.circleOwnerName,
+    splitHint: deal.splitHint,
+    serperBacked: deal.serperBacked,
+  }
+}
 
 interface DealsFeedProps {
   onDealClick: (deal: Deal) => void
 }
 
 export function DealsFeed({ onDealClick }: DealsFeedProps) {
+  const { user } = useAuth()
+  const { searchCards, loading: cardsLoading } = useDealSearchCards(user?.id)
+  const { openLeadForm } = useCardLead()
+  const [deals, setDeals] = useState<ViralDeal[]>([])
+  const [summary, setSummary] = useState<string>("")
+  const [usedSerper, setUsedSerper] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadDeals = useCallback(async () => {
+    if (!user) {
+      setDeals([])
+      setSummary("Sign in to see live viral deals with cards outside your wallet.")
+      return
+    }
+
+    if (cardsLoading) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/deals/viral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ searchCards }),
+      })
+
+      const payload = (await response.json()) as {
+        deals?: ViralDeal[]
+        summary?: string
+        used_serper?: boolean
+        error?: string
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to load deals.")
+      }
+
+      setDeals(payload.deals ?? [])
+      setSummary(payload.summary ?? "")
+      setUsedSerper(Boolean(payload.used_serper))
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not load viral deals."
+      setError(message)
+      setDeals([])
+    } finally {
+      setLoading(false)
+    }
+  }, [user, searchCards, cardsLoading])
+
+  useEffect(() => {
+    void loadDeals()
+  }, [loadDeals])
+
   return (
     <div className="px-4 pb-32 pt-2">
-      {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-5 h-5 text-emerald-400" />
-          <span className="text-emerald-400 text-sm font-semibold uppercase tracking-wider">
-            Live Price Drops
+        <div className="mb-1 flex items-center gap-2">
+          <Zap className="h-5 w-5 text-emerald-400" />
+          <span className="text-sm font-semibold uppercase tracking-wider text-emerald-400">
+            Live viral picks
           </span>
+          {usedSerper ? (
+            <span className="rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-blue-300">
+              Serper
+            </span>
+          ) : null}
         </div>
-        <h1 className="text-2xl font-bold text-slate-50 text-balance">
-          Pool Cards. Unlock Deals.
+        <h1 className="text-balance text-2xl font-bold text-slate-50">
+          Cashback outside your wallet
         </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Sample deals below — tap to ping your circle
+        <p className="mt-1 text-sm leading-relaxed text-slate-400">
+          Best card for each trending product on Amazon, Flipkart &amp; eBay —
+          only cards <strong className="text-slate-300">not in your wallet</strong>.
+          Pool with circle for a{" "}
+          <strong className="text-emerald-300">50% cashback split</strong>, or
+          apply for your own card.
         </p>
+        {summary ? (
+          <p className="mt-2 text-xs text-slate-500">{summary}</p>
+        ) : null}
       </div>
 
-      {/* Deals Grid */}
-      <div className="space-y-4">
-        {mockDeals.map((deal) => (
-          <button
-            key={deal.id}
-            onClick={() => onDealClick(deal)}
-            className="w-full text-left group"
+      <div className="mb-4 flex justify-end">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={loading || cardsLoading || !user}
+          onClick={() => void loadDeals()}
+          className="border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800"
+        >
+          {loading ? (
+            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-1 h-3.5 w-3.5" />
+          )}
+          Refresh
+        </Button>
+      </div>
+
+      {!user ? (
+        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center">
+          <p className="font-medium text-slate-300">Sign in for live deals</p>
+          <p className="mt-1 text-sm text-slate-500">
+            We hide cards already in your wallet and surface the best outside
+            options.
+          </p>
+        </div>
+      ) : loading || cardsLoading ? (
+        <div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-slate-800/50 bg-slate-900/40">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-red-500/20 bg-red-950/20 p-6 text-center">
+          <p className="font-medium text-red-300">{error}</p>
+          <Button
+            type="button"
+            size="sm"
+            className="mt-3"
+            onClick={() => void loadDeals()}
           >
-            <div
+            Retry
+          </Button>
+        </div>
+      ) : deals.length === 0 ? (
+        <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-6 text-center">
+          <p className="font-medium text-slate-300">No outside-wallet deals</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Either Serper returned no products, or every viral pick already
+            matches a card in your wallet.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {deals.map((deal) => (
+            <article
+              key={deal.id}
               className={cn(
                 "relative overflow-hidden rounded-2xl",
-                "bg-slate-900/60 backdrop-blur-md",
-                "border border-slate-800/50",
-                "p-4 transition-all duration-300",
-                "hover:border-emerald-400/30 hover:bg-slate-900/80",
-                "active:scale-[0.98]"
+                "border border-slate-800/50 bg-slate-900/60 backdrop-blur-md",
+                "p-4 shadow-lg shadow-black/10"
               )}
             >
-              {/* Top Row */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-slate-50 font-semibold text-lg leading-tight truncate group-hover:text-emerald-400 transition-colors">
-                      {deal.title}
-                    </h3>
-                    {deal.isDemo ? (
-                      <span className="shrink-0 rounded-md border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Demo
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-400">
+                      {deal.platform}
+                    </span>
+                    {deal.inCircle ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
+                        <Users className="h-3 w-3" />
+                        In circle
+                      </span>
+                    ) : null}
+                    {deal.serperBacked ? (
+                      <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                        Live offer
                       </span>
                     ) : null}
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-slate-500 line-through text-sm">
-                      ₹{deal.originalPrice.toLocaleString()}
+                  <h3 className="truncate text-lg font-semibold leading-tight text-slate-50">
+                    {deal.title}
+                  </h3>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-sm text-slate-500 line-through">
+                      ₹{deal.originalPrice.toLocaleString("en-IN")}
                     </span>
-                    <TrendingDown className="w-4 h-4 text-emerald-400" />
+                    <TrendingDown className="h-4 w-4 text-emerald-400" />
                   </div>
                 </div>
-                <div className="flex-shrink-0">
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center border border-slate-700/50">
-                    <Zap className="w-8 h-8 text-emerald-400/60" />
-                  </div>
+                <div
+                  className={cn(
+                    "flex h-16 w-[4.5rem] shrink-0 flex-col justify-between overflow-hidden rounded-lg border border-white/10 p-1.5 shadow-md",
+                    deal.styleClasses
+                  )}
+                >
+                  <span className="text-[7px] font-semibold uppercase opacity-80">
+                    {deal.cardBankName}
+                  </span>
+                  <span className="truncate text-[9px] font-bold leading-tight">
+                    {deal.cardName}
+                  </span>
                 </div>
               </div>
 
-              {/* Price Badge */}
               <div className="mt-3">
-                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-400/10 border border-emerald-400/20">
-                  <span className="text-emerald-400 font-bold text-lg">
-                    ₹{deal.discountedPrice.toLocaleString()}
+                <div className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2">
+                  <span className="text-lg font-bold text-emerald-400">
+                    ₹{deal.discountedPrice.toLocaleString("en-IN")}
                   </span>
-                  <span className="text-emerald-400/80 text-sm">
-                    with {deal.cardName} Card
+                  <span className="text-sm text-emerald-400/90">
+                    with {deal.cardLabel}
+                  </span>
+                  <span className="text-xs text-emerald-300/80">
+                    (save ₹{deal.cardDiscount.toLocaleString("en-IN")} ·{" "}
+                    {deal.discountPercent}%)
                   </span>
                 </div>
               </div>
 
-              {/* Bottom Row */}
-              <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/50">
-                <div className="flex items-center gap-1.5 text-slate-400 text-sm">
-                  <Clock className="w-4 h-4" />
-                  <span>{deal.timeLeft}</span>
+              <p className="mt-2 text-xs leading-relaxed text-violet-300/90">
+                {deal.splitHint}
+              </p>
+
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-800/50 pt-3">
+                <div className="flex items-center gap-1.5 text-sm text-slate-400">
+                  <Clock className="h-4 w-4" />
+                  <span>Not in your wallet</span>
                 </div>
-                <div className="text-xs text-emerald-400 font-medium uppercase tracking-wide">
-                  Tap to Ping →
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-violet-500/30 text-xs text-violet-300 hover:bg-violet-500/10"
+                    onClick={() =>
+                      openLeadForm({
+                        card_id: deal.cardId,
+                        bank_name: deal.cardBankName,
+                        card_name: deal.cardName,
+                        style_classes: deal.styleClasses,
+                        source: "viral_deals_feed",
+                      })
+                    }
+                  >
+                    Apply
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 bg-emerald-500/15 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25"
+                    onClick={() => onDealClick(viralDealToLegacyDeal(deal))}
+                  >
+                    Ping 50/50 →
+                  </Button>
                 </div>
               </div>
-            </div>
-          </button>
-        ))}
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
