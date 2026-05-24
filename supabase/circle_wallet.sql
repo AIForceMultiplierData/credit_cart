@@ -38,12 +38,12 @@ begin
   if jsonb_typeof(member_cards) = 'array' then
     for card in select value from jsonb_array_elements(member_cards)
     loop
-      if card ? 'card_id' then
+      if card ? 'card_id' or card ? 'id' then
         result := result || jsonb_build_array(
           jsonb_build_object(
-            'card_id', card->>'card_id',
+            'card_id', coalesce(card->>'card_id', card->>'id'),
             'bank_name', coalesce(card->>'bank_name', card->>'bank', ''),
-            'card_name', coalesce(card->>'card_name', card->>'name', ''),
+            'card_name', coalesce(card->>'card_name', card->>'name', card->>'network', ''),
             'source', 'wallet',
             'owner_user_id', uid::text,
             'owner_name', my_name
@@ -81,12 +81,12 @@ begin
 
     for card in select value from jsonb_array_elements(member_cards)
     loop
-      if card ? 'card_id' then
+      if card ? 'card_id' or card ? 'id' then
         result := result || jsonb_build_array(
           jsonb_build_object(
-            'card_id', card->>'card_id',
+            'card_id', coalesce(card->>'card_id', card->>'id'),
             'bank_name', coalesce(card->>'bank_name', card->>'bank', ''),
-            'card_name', coalesce(card->>'card_name', card->>'name', ''),
+            'card_name', coalesce(card->>'card_name', card->>'name', card->>'network', ''),
             'source', 'circle',
             'owner_user_id', member_id::text,
             'owner_name', member_name

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { SearchCardInput } from "@/lib/deal-search"
 import { supabase } from "@/lib/supabase"
 import { useWalletCards } from "@/hooks/useWalletCards"
@@ -9,18 +9,37 @@ function parseSearchCard(item: unknown): SearchCardInput | null {
   if (typeof item !== "object" || item === null) return null
   const row = item as Record<string, unknown>
 
-  if (
-    typeof row.card_id !== "string" ||
-    typeof row.bank_name !== "string" ||
-    typeof row.card_name !== "string"
-  ) {
+  const cardId =
+    typeof row.card_id === "string"
+      ? row.card_id
+      : typeof row.id === "string"
+        ? row.id
+        : null
+
+  const bankName =
+    typeof row.bank_name === "string"
+      ? row.bank_name
+      : typeof row.bank === "string"
+        ? row.bank
+        : null
+
+  const cardName =
+    typeof row.card_name === "string"
+      ? row.card_name
+      : typeof row.name === "string"
+        ? row.name
+        : typeof row.network === "string"
+          ? row.network
+          : null
+
+  if (!cardId || !bankName || !cardName) {
     return null
   }
 
   return {
-    card_id: row.card_id,
-    bank_name: row.bank_name,
-    card_name: row.card_name,
+    card_id: cardId,
+    bank_name: bankName,
+    card_name: cardName,
     source: row.source === "circle" ? "circle" : "wallet",
     owner_user_id:
       typeof row.owner_user_id === "string" ? row.owner_user_id : undefined,
@@ -46,41 +65,65 @@ function walletCardsToSearchCards(
   }))
 }
 
+function mergeSearchCards(
+  walletCards: SearchCardInput[],
+  rpcCards: SearchCardInput[]
+): SearchCardInput[] {
+  const walletIds = new Set(walletCards.map((c) => c.card_id))
+  const circleOnly = rpcCards.filter(
+    (c) => c.source === "circle" && !walletIds.has(c.card_id)
+  )
+  return [...walletCards, ...circleOnly]
+}
+
 export function useDealSearchCards(userId: string | undefined) {
   const { cards: walletOnly, loading: walletLoading } = useWalletCards(userId)
-  const [searchCards, setSearchCards] = useState<SearchCardInput[]>([])
-  const [loading, setLoading] = useState(Boolean(userId))
+  const [rpcCards, setRpcCards] = useState<SearchCardInput[]>([])
+  const [rpcLoading, setRpcLoading] = useState(false)
 
-  const refresh = useCallback(async () => {
+  const walletSearchCards = useMemo(
+    () => walletCardsToSearchCards(walletOnly, userId, "You"),
+    [walletOnly, userId]
+  )
+
+  const searchCards = useMemo(
+    () => mergeSearchCards(walletSearchCards, rpcCards),
+    [walletSearchCards, rpcCards]
+  )
+
+  const loadCircleCards = useCallback(async () => {
     if (!userId) {
-      setSearchCards([])
-      setLoading(false)
+      setRpcCards([])
       return
     }
 
-    setLoading(true)
+    setRpcLoading(true)
 
     const { data, error } = await supabase.rpc("get_deal_search_cards")
 
-    if (!error && Array.isArray(data)) {
-      const parsed = data
+    if (!error && data != null) {
+      const raw = Array.isArray(data)
+        ? data
+        : typeof data === "string"
+          ? (JSON.parse(data) as unknown[])
+          : []
+
+      const parsed = raw
         .map(parseSearchCard)
         .filter((card): card is SearchCardInput => card !== null)
 
-      if (parsed.length > 0) {
-        setSearchCards(parsed)
-        setLoading(false)
-        return
-      }
+      const circleOnly = parsed.filter((c) => c.source === "circle")
+      setRpcCards(circleOnly)
+    } else {
+      setRpcCards([])
     }
 
-    setSearchCards(walletCardsToSearchCards(walletOnly, userId, "You"))
-    setLoading(false)
-  }, [userId, walletOnly])
+    setRpcLoading(false)
+  }, [userId])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void loadCircleCards()
+  }, [loadCircleCards])
 
   const walletCount = searchCards.filter((c) => c.source === "wallet").length
   const circleCount = searchCards.filter((c) => c.source === "circle").length
@@ -89,7 +132,7 @@ export function useDealSearchCards(userId: string | undefined) {
     searchCards,
     walletCount,
     circleCount,
-    loading: loading || walletLoading,
-    refresh,
+    loading: walletLoading || rpcLoading,
+    refresh: loadCircleCards,
   }
 }

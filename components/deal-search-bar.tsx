@@ -83,6 +83,13 @@ export function DealSearchBar({
       return
     }
 
+    if (cardsLoading) {
+      toast.message("Loading wallet cards…", {
+        description: "One moment — syncing your cards for deal search.",
+      })
+      return
+    }
+
     if (searchCards.length === 0) {
       toast.error("Add a card first", {
         description: "Add cards to your wallet so we can find the best offer.",
@@ -219,6 +226,10 @@ export function DealSearchBar({
           <p className="mt-2 text-center text-xs text-slate-500">
             Comparing {walletCount} wallet + {circleCount} circle card
             {walletCount + circleCount === 1 ? "" : "s"}
+          </p>
+        ) : user && cardsLoading ? (
+          <p className="mt-2 text-center text-xs text-slate-500">
+            Syncing wallet cards…
           </p>
         ) : user && !cardsLoading ? (
           <p className="mt-2 text-center text-xs text-amber-300/90">

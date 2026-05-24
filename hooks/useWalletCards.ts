@@ -1,38 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
 import type { WalletCardRecord } from "@/components/add-card-modal"
-
-function normalizeCard(item: unknown): WalletCardRecord | null {
-  if (typeof item !== "object" || item === null) return null
-  const row = item as Record<string, unknown>
-
-  if (
-    typeof row.card_id === "string" &&
-    typeof row.bank_name === "string" &&
-    typeof row.card_name === "string"
-  ) {
-    return {
-      card_id: row.card_id,
-      bank_name: row.bank_name,
-      card_name: row.card_name,
-      style_classes:
-        typeof row.style_classes === "string"
-          ? row.style_classes
-          : "bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200",
-    }
-  }
-
-  return null
-}
-
-function parseCards(raw: unknown): WalletCardRecord[] {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map(normalizeCard)
-    .filter((card): card is WalletCardRecord => card !== null)
-}
+import { parseWalletCards } from "@/lib/wallet-cards"
+import { supabase } from "@/lib/supabase"
 
 export function useWalletCards(userId: string | undefined) {
   const [cards, setCards] = useState<WalletCardRecord[]>([])
@@ -56,9 +27,9 @@ export function useWalletCards(userId: string | undefined) {
         .eq("id", userId)
         .maybeSingle()
 
-      setCards(parseCards(profile?.cards))
+      setCards(parseWalletCards(profile?.cards))
     } else {
-      setCards(parseCards(data))
+      setCards(parseWalletCards(data))
     }
 
     setLoading(false)
