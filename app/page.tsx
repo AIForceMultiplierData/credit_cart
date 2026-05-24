@@ -3,8 +3,8 @@
 import { useState } from "react"
 import { BottomNav } from "@/components/bottom-nav"
 import { HomeView } from "@/components/home-view"
-import { DealsFeed, type Deal } from "@/components/deals-feed"
-import { LenderFeed } from "@/app/deals/lender-feed"
+import { DealsTabView } from "@/components/deals-tab-view"
+import { type Deal } from "@/components/deals-feed"
 import { WalletView } from "@/components/wallet-view"
 import { ActivityView } from "@/components/activity-view"
 import { PingDrawer } from "@/components/ping-drawer"
@@ -71,10 +71,7 @@ export default function HomePage() {
             <HomeView onNavigate={handleNavigate} onSignIn={handleSignIn} />
           )}
           {activeTab === "deals" && (
-            <>
-              <LenderFeed />
-              <DealsFeed onDealClick={handleDealClick} />
-            </>
+            <DealsTabView onDealClick={handleDealClick} />
           )}
           {activeTab === "wallet" && <WalletView />}
           {activeTab === "activity" && <ActivityView />}

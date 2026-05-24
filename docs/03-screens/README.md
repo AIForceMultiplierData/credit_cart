@@ -20,6 +20,6 @@ Each page documents: **UI purpose**, **data sources**, **calculation method** (A
 
 Four tabs via `BottomNav`: `home | wallet | deals | activity`.
 
-**Deals tab** renders **both** `LenderFeed` (top) and `DealsFeed` (bottom) — lenders see opportunities first, then viral picks.
+**Deals tab** uses a **mode toggle** (top-right): **Lending** vs **Hot deals live** — only one panel visible at a time. Preference saved in `localStorage`.
 
 Ping flow: `DealsFeed` → `onDealClick` → `PingDrawer`.
