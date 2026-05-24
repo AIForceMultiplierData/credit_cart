@@ -10,6 +10,7 @@ export type ViralDeal = {
   cardId: string
   cardBankName: string
   cardName: string
+  bankLogoUrl?: string | null
   cardLabel: string
   cardDiscount: number
   discountPercent: number
@@ -86,6 +87,7 @@ export function missingTeaserToViralDeal(
     cardId: teaser.card_id,
     cardBankName: teaser.bank_name,
     cardName: teaser.card_name,
+    bankLogoUrl: teaser.bank_logo_url,
     cardLabel: `${teaser.bank_name} ${teaser.card_name}`,
     cardDiscount,
     discountPercent: teaser.discount_percent,

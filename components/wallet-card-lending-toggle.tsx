@@ -1,6 +1,7 @@
 "use client"
 
 import { Cpu } from "lucide-react"
+import { BankLogo } from "@/components/bank-logo"
 import type { WalletCardRecord } from "@/components/add-card-modal"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -78,9 +79,13 @@ export function WalletCardTile({ card, lendingToggle }: WalletCardTileProps) {
           <div className="flex h-6 w-8 items-center justify-center rounded bg-white/20 backdrop-blur-sm">
             <Cpu className="h-3.5 w-3.5 opacity-90" aria-hidden />
           </div>
-          <span className="text-[8px] font-semibold uppercase tracking-wider opacity-70">
-            {card.bank_name}
-          </span>
+          <BankLogo
+            bankName={card.bank_name}
+            bankId={card.bank_id}
+            logoUrl={card.bank_logo_url}
+            className="h-4 max-w-[3.5rem]"
+            imageClassName="h-4 w-auto max-w-[3.5rem]"
+          />
         </div>
         <div className="relative">
           <p className="text-xs font-bold leading-tight">{card.card_name}</p>

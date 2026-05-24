@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-cards",
-      "schedule": "0 1 * * *"
+      "schedule": "30 0 * * *"
     }
   ]
 }

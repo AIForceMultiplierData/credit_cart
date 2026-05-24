@@ -1,25 +1,36 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import * as cheerio from "cheerio"
+import { resolveBankProfile } from "@/lib/bank-registry"
 import { call_ai } from "@/lib/llm-router"
 
 const CARD_EXTRACTION_PROMPT =
-  "Extract any newly mentioned Indian credit cards. Return ONLY a valid JSON array of objects with keys: bank_name, card_name, and generate a style_classes string representing its brand colors using Tailwind CSS gradients."
+  "Extract any newly mentioned Indian credit cards. Return ONLY a valid JSON array of objects with keys: bank_name, card_name, style_classes (Tailwind gradient classes for brand colors), and optional network (visa/mastercard/rupay/diners), card_tier (entry/mid/premium), apply_url."
 
 const DEFAULT_SCRAPE_URL =
   process.env.CARD_SCRAPE_URL ??
   "https://www.livemint.com/topic/credit-cards"
 
+/** Vercel Cron: 30 0 * * * UTC = 06:00 IST daily (Cheerio scrape + LLM + Supabase upsert). */
+
 type ExtractedCard = {
   bank_name: string
   card_name: string
   style_classes: string
+  network?: string
+  card_tier?: string
+  apply_url?: string
 }
 
 type CardCatalogRow = {
   card_id: string
+  bank_id: string
   bank_name: string
+  bank_logo_url: string
   card_name: string
   style_classes: string
+  network?: string | null
+  card_tier?: string | null
+  apply_url?: string | null
   is_active: boolean
 }
 
@@ -211,6 +222,43 @@ async function scrapeAndExtractCards(): Promise<{
   }
 }
 
+async function upsertBanksFromCards(
+  supabase: SupabaseClient,
+  cards: Array<{ bank_name: string }>
+): Promise<string[]> {
+  const errors: string[] = []
+  const uniqueBanks = new Map<string, ReturnType<typeof resolveBankProfile>>()
+
+  for (const card of cards) {
+    const bankName = normalizeBankName(card.bank_name)
+    const profile = resolveBankProfile(bankName)
+    uniqueBanks.set(profile.bank_id, profile)
+  }
+
+  if (uniqueBanks.size === 0) return errors
+
+  const rows = [...uniqueBanks.values()].map((bank) => ({
+    bank_id: bank.bank_id,
+    bank_name: bank.bank_name,
+    logo_url: bank.logo_url,
+    brand_color: bank.brand_color,
+    style_classes: bank.style_classes,
+    display_order: bank.display_order,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  }))
+
+  const { error } = await supabase.from("card_banks").upsert(rows, {
+    onConflict: "bank_id",
+  })
+
+  if (error) {
+    errors.push(`Failed to upsert card_banks: ${error.message}`)
+  }
+
+  return errors
+}
+
 async function upsertCardsToCatalog(
   supabase: SupabaseClient,
   cards: ExtractedCard[]
@@ -224,11 +272,21 @@ async function upsertCardsToCatalog(
     return { upserted: 0, inserted, updated, skipped, errors }
   }
 
-  const normalized = cards.map((card) => ({
-    bank_name: normalizeBankName(card.bank_name),
-    card_name: normalizeCardName(card.card_name),
-    style_classes: card.style_classes.trim(),
-  }))
+  const normalized = cards.map((card) => {
+    const bankName = normalizeBankName(card.bank_name)
+    const bank = resolveBankProfile(bankName)
+
+    return {
+      bank_name: bankName,
+      bank_id: bank.bank_id,
+      bank_logo_url: bank.logo_url,
+      card_name: normalizeCardName(card.card_name),
+      style_classes: card.style_classes.trim() || bank.style_classes,
+      network: card.network?.trim().toLowerCase() ?? null,
+      card_tier: card.card_tier?.trim().toLowerCase() ?? null,
+      apply_url: card.apply_url?.trim() ?? null,
+    }
+  })
 
   const cardIds = normalized.map((card) =>
     toCardId(card.bank_name, card.card_name)
@@ -263,9 +321,14 @@ async function upsertCardsToCatalog(
 
     rowsToUpsert.push({
       card_id: cardId,
+      bank_id: card.bank_id,
       bank_name: card.bank_name,
+      bank_logo_url: card.bank_logo_url,
       card_name: card.card_name,
       style_classes: card.style_classes,
+      network: card.network,
+      card_tier: card.card_tier,
+      apply_url: card.apply_url,
       is_active: true,
     })
 
@@ -352,6 +415,8 @@ export async function GET(request: Request) {
     if (cards.length > 0) {
       try {
         const supabase = createAdminClient()
+        const bankErrors = await upsertBanksFromCards(supabase, cards)
+        summaryErrors.push(...bankErrors)
         upsertStats = await upsertCardsToCatalog(supabase, cards)
         summaryErrors.push(...upsertStats.errors)
       } catch (err) {

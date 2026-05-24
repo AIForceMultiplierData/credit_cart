@@ -6,6 +6,8 @@ Execute scripts in **Supabase Dashboard → SQL Editor** in this order. Each fil
 |---|------|-----------------|
 | 1 | `profiles.sql` | `profiles` table, RLS, signup trigger |
 | 2 | `card_catalog.sql` | `card_catalog` reference table |
+| 2b | `card_catalog_master.sql` | `card_banks` dimension + enriched `card_catalog_master` view |
+| 9 | `analytics_semantic_layer.sql` | Analytics facts/dimensions + funnel views |
 | 3 | `wallet_policies.sql` | `get_or_create_my_wallet`, `upsert_my_wallet` RPCs |
 | 4 | `profile_edit.sql` | `full_name` and profile edit fields |
 | 5 | `trust_score.sql` | `trust_score`, `get_trust_scores` RPC |

@@ -1,4 +1,5 @@
 import type { WalletCardRecord } from "@/components/add-card-modal"
+import { getBankLogoUrl } from "@/lib/bank-registry"
 
 const LEGACY_BANK_STYLES: Record<string, string> = {
   HDFC: "bg-gradient-to-br from-blue-900 to-slate-900 text-blue-100",
@@ -41,7 +42,12 @@ export function normalizeWalletCard(item: unknown): WalletCardRecord | null {
     return withLendingFlag(
       {
         card_id: row.card_id,
+        bank_id: typeof row.bank_id === "string" ? row.bank_id : null,
         bank_name: row.bank_name,
+        bank_logo_url:
+          typeof row.bank_logo_url === "string"
+            ? row.bank_logo_url
+            : getBankLogoUrl(row.bank_name),
         card_name: row.card_name,
         style_classes:
           typeof row.style_classes === "string"
@@ -98,7 +104,9 @@ export function parseWalletCards(raw: unknown): WalletCardRecord[] {
 export function serializeWalletCards(cards: WalletCardRecord[]): WalletCardRecord[] {
   return cards.map((card) => ({
     card_id: card.card_id,
+    bank_id: card.bank_id ?? null,
     bank_name: card.bank_name,
+    bank_logo_url: card.bank_logo_url ?? null,
     card_name: card.card_name,
     style_classes: card.style_classes,
     active_for_lending: Boolean(card.active_for_lending),

@@ -1,13 +1,18 @@
+import { BANK_REGISTRY } from "@/lib/bank-registry"
+
 export type CatalogCard = {
   card_id: string
   bank_name: string
+  bank_logo_url?: string
   card_name: string
   style_classes: string
   apply_url: string
 }
 
-/** Mirror of supabase/card_catalog.sql — used server-side for deal teasers. */
-export const CARD_CATALOG: CatalogCard[] = [
+const logo = (bank: string) =>
+  BANK_REGISTRY.find((b) => b.bank_name === bank)?.logo_url ?? "/banks/default.svg"
+
+const RAW_CATALOG: Omit<CatalogCard, "bank_logo_url">[] = [
   {
     card_id: "hdfc_millennia",
     bank_name: "HDFC",
@@ -85,6 +90,12 @@ export const CARD_CATALOG: CatalogCard[] = [
       "https://www.axis.bank.in/cards/credit-card/axis-bank-magnus-credit-card",
   },
 ]
+
+/** Mirror of supabase/card_catalog — used server-side for deal teasers. */
+export const CARD_CATALOG: CatalogCard[] = RAW_CATALOG.map((card) => ({
+  ...card,
+  bank_logo_url: logo(card.bank_name),
+}))
 
 export function getCatalogCard(cardId: string): CatalogCard | undefined {
   return CARD_CATALOG.find((card) => card.card_id === cardId)

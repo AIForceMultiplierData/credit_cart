@@ -6,7 +6,7 @@ import { DealsFeed, type Deal } from "@/components/deals-feed"
 import { LenderFeed } from "@/app/deals/lender-feed"
 import { cn } from "@/lib/utils"
 
-export type DealsDashboardMode = "lending" | "hot-deals"
+export type DealsDashboardMode = "earning" | "hot-deals"
 
 const STORAGE_KEY = "poolpay_deals_mode"
 
@@ -22,9 +22,9 @@ const MODES: Array<{
   activeClass: string
 }> = [
   {
-    id: "lending",
-    label: "Lending mode",
-    shortLabel: "Lending",
+    id: "earning",
+    label: "Earning mode",
+    shortLabel: "Earning",
     icon: Sparkles,
     activeClass: "bg-blue-500/20 text-blue-200 shadow-sm shadow-blue-500/10",
   },
@@ -41,7 +41,9 @@ const MODES: Array<{
 function readStoredMode(): DealsDashboardMode {
   if (typeof window === "undefined") return "hot-deals"
   const stored = window.localStorage.getItem(STORAGE_KEY)
-  return stored === "lending" ? "lending" : "hot-deals"
+  if (stored === "earning" || stored === "lending") return "earning"
+  if (stored === "hot-deals") return "hot-deals"
+  return "hot-deals"
 }
 
 export function DealsTabView({ onDealClick }: DealsTabViewProps) {
@@ -106,7 +108,7 @@ export function DealsTabView({ onDealClick }: DealsTabViewProps) {
         </div>
       </div>
 
-      {hydrated && mode === "lending" ? (
+      {hydrated && mode === "earning" ? (
         <LenderFeed />
       ) : hydrated ? (
         <DealsFeed onDealClick={onDealClick} />

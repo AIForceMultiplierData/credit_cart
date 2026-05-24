@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react"
 import { useCardLead } from "@/components/card-lead-provider"
+import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
 import type { ViralDeal } from "@/lib/viral-deals"
 import { useAuth } from "@/hooks/useAuth"
 import { useDealSearchCards } from "@/hooks/useDealSearchCards"
@@ -243,19 +244,13 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
                     <TrendingDown className="h-4 w-4 text-emerald-400" />
                   </div>
                 </div>
-                <div
-                  className={cn(
-                    "flex h-16 w-[4.5rem] shrink-0 flex-col justify-between overflow-hidden rounded-lg border border-white/10 p-1.5 shadow-md",
-                    deal.styleClasses
-                  )}
-                >
-                  <span className="text-[7px] font-semibold uppercase opacity-80">
-                    {deal.cardBankName}
-                  </span>
-                  <span className="truncate text-[9px] font-bold leading-tight">
-                    {deal.cardName}
-                  </span>
-                </div>
+                <CardCatalogThumbnail
+                  bankName={deal.cardBankName}
+                  bankLogoUrl={deal.bankLogoUrl}
+                  cardName={deal.cardName}
+                  styleClasses={deal.styleClasses}
+                  className="w-[4.75rem] shrink-0"
+                />
               </div>
 
               <div className="mt-3">

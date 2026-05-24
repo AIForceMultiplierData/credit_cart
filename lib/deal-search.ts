@@ -71,6 +71,7 @@ export type MarketOffer = {
 export type MissingCardTeaser = {
   card_id: string
   bank_name: string
+  bank_logo_url?: string | null
   card_name: string
   style_classes: string
   discount_percent: number

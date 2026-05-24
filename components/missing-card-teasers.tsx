@@ -1,10 +1,10 @@
 "use client"
 
-import { Cpu, Users } from "lucide-react"
+import { Users } from "lucide-react"
 import type { MissingCardTeaser } from "@/lib/deal-search"
+import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
 import { useAuth } from "@/hooks/useAuth"
 import { useCardLead } from "@/components/card-lead-provider"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 type MissingCardTeasersProps = {
@@ -63,30 +63,19 @@ export function MissingCardTeasers({
       <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
         {teasers.map((teaser) => (
           <article key={teaser.card_id} className="w-[108px] shrink-0">
-            <div
-              className={cn(
-                "relative aspect-[1.58/1] overflow-hidden rounded-lg p-2 shadow-md",
-                "flex flex-col justify-between border border-white/10",
-                teaser.style_classes
-              )}
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
-              <div className="relative flex items-start justify-between gap-1">
-                <div className="flex h-5 w-6 items-center justify-center rounded bg-white/20">
-                  <Cpu className="h-2.5 w-2.5 opacity-90" aria-hidden />
-                </div>
-                <span className="truncate text-[7px] font-semibold uppercase tracking-wide opacity-75">
-                  {teaser.bank_name}
-                </span>
-              </div>
-              <div className="relative min-w-0">
-                <p className="truncate text-[10px] font-bold leading-tight">
-                  {teaser.card_name}
-                </p>
-                <p className="mt-0.5 text-[9px] font-semibold text-emerald-300/95">
-                  Save {formatSavings(teaser, estimatedPrice)}
-                </p>
-              </div>
+            <div className="relative">
+              <CardCatalogThumbnail
+                bankName={teaser.bank_name}
+                bankLogoUrl={teaser.bank_logo_url}
+                cardName={teaser.card_name}
+                styleClasses={teaser.style_classes}
+                className="rounded-lg p-2"
+                subtitle={
+                  <span className="font-semibold text-emerald-300/95">
+                    Save {formatSavings(teaser, estimatedPrice)}
+                  </span>
+                }
+              />
               {teaser.in_circle ? (
                 <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500/30 text-blue-200">
                   <Users className="h-2.5 w-2.5" aria-label="In circle" />

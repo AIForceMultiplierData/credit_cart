@@ -1,4 +1,5 @@
 import { CARD_CATALOG } from "@/lib/card-catalog"
+import { getBankLogoUrl } from "@/lib/bank-registry"
 import { cardsReferToSameCard, isCardInWallet } from "@/lib/card-identity"
 import {
   detectPlatform,
@@ -162,6 +163,7 @@ export function buildMissingCardTeasers(input: {
     candidates.push({
       card_id: catalog.card_id,
       bank_name: catalog.bank_name,
+      bank_logo_url: getBankLogoUrl(catalog.bank_name, catalog.bank_logo_url),
       card_name: catalog.card_name,
       style_classes: catalog.style_classes,
       discount_percent: discountPercent,

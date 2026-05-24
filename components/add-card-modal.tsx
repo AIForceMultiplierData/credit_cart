@@ -1,8 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, Cpu, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { BankLogo } from "@/components/bank-logo"
+import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
+import { resolveBankProfile } from "@/lib/bank-registry"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -16,42 +19,75 @@ import {
 
 export type CardCatalogRow = {
   card_id: string
+  bank_id: string | null
+  bank_name: string
+  bank_logo_url: string | null
+  card_name: string
+  style_classes: string
+  network: string | null
+  card_tier: string | null
+  apply_url: string | null
+  is_active: boolean
+}
+
+export type WalletCardRecord = {
+  card_id: string
+  bank_id?: string | null
+  bank_name: string
+  bank_logo_url?: string | null
+  card_name: string
+  style_classes: string
+  active_for_lending: boolean
+}
+
+type BankOption = {
+  bank_name: string
+  bank_id: string
+  bank_logo_url: string
+  style_classes: string
+}
+
+type CardCatalogSelect = Partial<CardCatalogRow> & {
+  card_id: string
   bank_name: string
   card_name: string
   style_classes: string
   is_active: boolean
 }
 
-export type WalletCardRecord = {
-  card_id: string
-  bank_name: string
-  card_name: string
-  style_classes: string
-  active_for_lending: boolean
-}
+function enrichCatalogRow(row: CardCatalogSelect): CardCatalogRow {
+  const bank = resolveBankProfile(row.bank_name, row.bank_id)
 
-type CardCatalogSelect = Pick<
-  CardCatalogRow,
-  "card_id" | "bank_name" | "card_name" | "style_classes" | "is_active"
->
-
-function isCardCatalogRow(value: unknown): value is CardCatalogRow {
-  if (typeof value !== "object" || value === null) return false
-
-  const row = value as Record<string, unknown>
-
-  return (
-    typeof row.card_id === "string" &&
-    typeof row.bank_name === "string" &&
-    typeof row.card_name === "string" &&
-    typeof row.style_classes === "string" &&
-    typeof row.is_active === "boolean"
-  )
+  return {
+    card_id: row.card_id,
+    bank_id: row.bank_id ?? bank.bank_id,
+    bank_name: row.bank_name,
+    bank_logo_url: row.bank_logo_url ?? bank.logo_url,
+    card_name: row.card_name,
+    style_classes: row.style_classes,
+    network: row.network ?? null,
+    card_tier: row.card_tier ?? null,
+    apply_url: row.apply_url ?? null,
+    is_active: row.is_active,
+  }
 }
 
 function parseCatalogRows(raw: unknown): CardCatalogRow[] {
   if (!Array.isArray(raw)) return []
-  return raw.filter(isCardCatalogRow)
+
+  return raw
+    .filter((row): row is CardCatalogSelect => {
+      if (typeof row !== "object" || row === null) return false
+      const item = row as Record<string, unknown>
+      return (
+        typeof item.card_id === "string" &&
+        typeof item.bank_name === "string" &&
+        typeof item.card_name === "string" &&
+        typeof item.style_classes === "string" &&
+        typeof item.is_active === "boolean"
+      )
+    })
+    .map(enrichCatalogRow)
 }
 
 type AddCardModalProps = {
@@ -81,28 +117,19 @@ function CatalogCardPreview({
           "rounded-xl ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950"
       )}
     >
-      <div
-        className={cn(
-          "relative aspect-[1.58/1] w-full overflow-hidden rounded-xl p-4 shadow-lg",
-          "flex flex-col justify-between border border-white/10",
-          card.style_classes
-        )}
-      >
-        <div className="flex items-start justify-between">
-          <div className="flex h-8 w-10 items-center justify-center rounded-md bg-white/20 backdrop-blur-sm">
-            <Cpu className="h-4 w-4 opacity-90" aria-hidden />
-          </div>
-          <span className="text-[10px] font-semibold uppercase tracking-widest opacity-70">
-            {card.bank_name}
-          </span>
-        </div>
-        <div>
-          <p className="text-lg font-bold leading-tight">{card.card_name}</p>
-          <p className="mt-1 font-mono text-[10px] tracking-widest opacity-60">
+      <CardCatalogThumbnail
+        bankName={card.bank_name}
+        bankId={card.bank_id}
+        bankLogoUrl={card.bank_logo_url}
+        cardName={card.card_name}
+        styleClasses={card.style_classes}
+        className="w-full p-4 shadow-lg"
+        subtitle={
+          <span className="font-mono tracking-widest opacity-60">
             •••• •••• •••• 4242
-          </p>
-        </div>
-      </div>
+          </span>
+        }
+      />
     </button>
   )
 }
@@ -127,12 +154,30 @@ export function AddCardModal({
       setCatalogLoading(true)
       setCatalogError(null)
 
+      const masterSelect =
+        "card_id, bank_id, bank_name, bank_logo_url, card_name, style_classes, network, card_tier, apply_url, is_active"
+
       try {
-        const { data, error } = await supabase
-          .from("card_catalog")
-          .select("card_id, bank_name, card_name, style_classes, is_active")
-          .eq("is_active", true)
+        let data: CardCatalogSelect[] | null = null
+        let error: { message: string } | null = null
+
+        const masterResult = await supabase
+          .from("card_catalog_master")
+          .select(masterSelect)
           .returns<CardCatalogSelect[]>()
+
+        if (masterResult.error) {
+          const fallback = await supabase
+            .from("card_catalog")
+            .select(masterSelect)
+            .eq("is_active", true)
+            .returns<CardCatalogSelect[]>()
+
+          data = fallback.data
+          error = fallback.error
+        } else {
+          data = masterResult.data
+        }
 
         if (error) throw error
 
@@ -168,13 +213,22 @@ export function AddCardModal({
     }
   }, [open])
 
-  const banks = useMemo(
-    () =>
-      [...new Set(catalogData.map((row) => row.bank_name))].sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    [catalogData]
-  )
+  const banks = useMemo(() => {
+    const map = new Map<string, BankOption>()
+
+    for (const row of catalogData) {
+      if (map.has(row.bank_name)) continue
+      const profile = resolveBankProfile(row.bank_name, row.bank_id)
+      map.set(row.bank_name, {
+        bank_name: row.bank_name,
+        bank_id: profile.bank_id,
+        bank_logo_url: row.bank_logo_url ?? profile.logo_url,
+        style_classes: profile.style_classes,
+      })
+    }
+
+    return [...map.values()].sort((a, b) => a.bank_name.localeCompare(b.bank_name))
+  }, [catalogData])
 
   const bankCards = useMemo(
     () =>
@@ -194,7 +248,9 @@ export function AddCardModal({
     try {
       await onAddToWallet({
         card_id: selectedCard.card_id,
+        bank_id: selectedCard.bank_id,
         bank_name: selectedCard.bank_name,
+        bank_logo_url: selectedCard.bank_logo_url,
         card_name: selectedCard.card_name,
         style_classes: selectedCard.style_classes,
         active_for_lending: false,
@@ -211,14 +267,14 @@ export function AddCardModal({
         <div className="border-b border-slate-800/80 bg-slate-900/60 px-5 py-4 backdrop-blur-md">
           <DialogHeader className="space-y-1 text-left">
             <DialogTitle className="text-lg font-bold text-slate-50">
-              {selectedBank ? `Choose ${selectedBank} Card` : "Select Your Bank"}
+              {selectedBank ? "Choose your card" : "Select your bank"}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
               {selectedCard
                 ? "Confirm and add this card to your trusted circle wallet."
                 : selectedBank
                   ? "Scroll and tap the card that matches your wallet."
-                  : "Pick a bank to browse the live card catalog."}
+                  : "Pick a bank logo to browse the live card catalog."}
             </DialogDescription>
           </DialogHeader>
           {selectedBank && (
@@ -254,21 +310,30 @@ export function AddCardModal({
             <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center backdrop-blur-md">
               <p className="font-medium text-slate-300">No cards available</p>
               <p className="mt-1 text-sm text-slate-500">
-                The catalog is empty. Add rows to card_catalog in Supabase.
+                Run card_catalog_master.sql in Supabase, then wait for the 6 AM
+                catalog sync.
               </p>
             </div>
           ) : !selectedBank ? (
             <div className="grid grid-cols-2 gap-3">
               {banks.map((bank) => (
-                <Button
-                  key={bank}
+                <button
+                  key={bank.bank_name}
                   type="button"
-                  variant="outline"
-                  className="h-16 rounded-xl border-slate-700 bg-slate-900/40 text-base font-bold text-slate-100 hover:border-emerald-500/40 hover:bg-slate-800 hover:text-emerald-300"
-                  onClick={() => setSelectedBank(bank)}
+                  onClick={() => setSelectedBank(bank.bank_name)}
+                  className={cn(
+                    "flex h-20 flex-col items-center justify-center gap-2 rounded-xl border border-white/10 p-3 shadow-md transition-transform active:scale-[0.98]",
+                    bank.style_classes
+                  )}
                 >
-                  {bank}
-                </Button>
+                  <BankLogo
+                    bankName={bank.bank_name}
+                    bankId={bank.bank_id}
+                    logoUrl={bank.bank_logo_url}
+                    className="h-6 max-w-[5rem]"
+                    imageClassName="h-6 w-auto max-w-[5rem]"
+                  />
+                </button>
               ))}
             </div>
           ) : (
