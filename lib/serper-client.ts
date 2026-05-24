@@ -150,6 +150,20 @@ function buildProductQuery(
   return `${platform} ${url} price India`
 }
 
+function buildPlatformBestCardsQuery(
+  platform: string,
+  category: string
+): string {
+  const vertical =
+    category === "flight"
+      ? "flight booking"
+      : category === "hotels"
+        ? "hotel booking"
+        : "online shopping"
+
+  return `best credit card ${platform} ${vertical} cashback offer India 2025 2026 HDFC ICICI Axis SBI`
+}
+
 function buildCardOffersQuery(
   platform: string,
   category: string,
@@ -200,23 +214,33 @@ export async function fetchSerperDealContext(input: {
     input.category,
     input.walletCards
   )
+  const platformBestQuery = buildPlatformBestCardsQuery(
+    input.platform,
+    input.category
+  )
 
   const needsProductSearch =
     !input.existingTitle ||
     input.existingPrice === null ||
     input.existingPrice === undefined
 
-  const [productSearch, offersSearch, shoppingSearch] = await Promise.all([
-    needsProductSearch
-      ? serperPost<SerperSearchResponse>(SERPER_SEARCH_URL, { q: productQuery })
-      : Promise.resolve(null),
-    serperPost<SerperSearchResponse>(SERPER_SEARCH_URL, { q: offersQuery }),
-    needsProductSearch && /amazon|flipkart|product/i.test(input.platform)
-      ? serperPost<SerperSearchResponse>(SERPER_SHOPPING_URL, {
-          q: input.existingTitle || productQuery,
-        })
-      : Promise.resolve(null),
-  ])
+  const [productSearch, offersSearch, platformBestSearch, shoppingSearch] =
+    await Promise.all([
+      needsProductSearch
+        ? serperPost<SerperSearchResponse>(SERPER_SEARCH_URL, {
+            q: productQuery,
+          })
+        : Promise.resolve(null),
+      serperPost<SerperSearchResponse>(SERPER_SEARCH_URL, { q: offersQuery }),
+      serperPost<SerperSearchResponse>(SERPER_SEARCH_URL, {
+        q: platformBestQuery,
+      }),
+      needsProductSearch && /amazon|flipkart|product/i.test(input.platform)
+        ? serperPost<SerperSearchResponse>(SERPER_SHOPPING_URL, {
+            q: input.existingTitle || productQuery,
+          })
+        : Promise.resolve(null),
+    ])
 
   const productSnippets = dedupeOrganic([
     ...(productSearch?.organic ?? []),
@@ -234,10 +258,10 @@ export async function fetchSerperDealContext(input: {
       : []),
   ]).slice(0, 6)
 
-  const cardOfferSnippets = dedupeOrganic(offersSearch?.organic ?? []).slice(
-    0,
-    8
-  )
+  const cardOfferSnippets = dedupeOrganic([
+    ...(offersSearch?.organic ?? []),
+    ...(platformBestSearch?.organic ?? []),
+  ]).slice(0, 12)
 
   const shoppingResults = (shoppingSearch?.shopping ?? []).slice(0, 5)
 
@@ -289,6 +313,7 @@ export async function fetchSerperDealContext(input: {
     queries_run: [
       ...(needsProductSearch ? [productQuery] : []),
       offersQuery,
+      platformBestQuery,
       ...(shoppingSearch ? [input.existingTitle || productQuery] : []),
     ],
   }

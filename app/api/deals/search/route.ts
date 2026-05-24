@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const result = await searchDealsForWallet(
       parsed.category,
       parsed.url,
-      parsed.walletCards
+      parsed.searchCards
     )
 
     return NextResponse.json(result)

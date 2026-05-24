@@ -6,6 +6,12 @@ export type WalletCardInput = {
   card_name: string
 }
 
+export type SearchCardInput = WalletCardInput & {
+  source: "wallet" | "circle"
+  owner_user_id?: string
+  owner_name?: string
+}
+
 export type DealOffer = {
   card_id: string
   bank_name: string
@@ -15,6 +21,10 @@ export type DealOffer = {
   estimated_final_price: number | null
   reason: string
   recommended: boolean
+  source: "wallet" | "circle"
+  owner_user_id?: string
+  owner_name?: string
+  serper_backed?: boolean
 }
 
 export type DealSearchResult = {
@@ -30,6 +40,9 @@ export type DealSearchResult = {
   used_serper: boolean
   data_sources: string[]
   market_offers: MarketOffer[]
+  missing_card_teasers: MissingCardTeaser[]
+  wallet_card_count: number
+  circle_card_count: number
 }
 
 export type MarketOffer = {
@@ -37,6 +50,20 @@ export type MarketOffer = {
   snippet: string
   source: string
   url?: string
+}
+
+export type MissingCardTeaser = {
+  card_id: string
+  bank_name: string
+  card_name: string
+  style_classes: string
+  discount_percent: number
+  discount_amount: number
+  reason: string
+  in_circle: boolean
+  circle_owner_name?: string
+  serper_backed: boolean
+  apply_url: string
 }
 
 const PLATFORM_RULES: Array<{
@@ -111,13 +138,13 @@ export function detectPlatform(url: string): string {
 export function buildFallbackResult(
   category: DealSearchCategory,
   url: string,
-  walletCards: WalletCardInput[],
+  searchCards: SearchCardInput[],
   estimatedPrice: number | null = null
 ): DealSearchResult {
   const platform = detectPlatform(url)
   const rule = PLATFORM_RULES.find((entry) => entry.pattern.test(url))
 
-  const offers: DealOffer[] = walletCards.map((card) => {
+  const offers: DealOffer[] = searchCards.map((card) => {
     const label = `${card.bank_name} ${card.card_name}`
     const matcher = rule?.cardMatchers.find((entry) =>
       entry.pattern.test(label)
@@ -141,11 +168,20 @@ export function buildFallbackResult(
       reason:
         matcher?.reason ??
         `${label} may give ~${discountPercent}% value back on ${platform} via cashback or rewards.`,
-      recommended: Boolean(matcher),
+      recommended: false,
+      source: card.source,
+      owner_user_id: card.owner_user_id,
+      owner_name: card.owner_name,
+      serper_backed: false,
     }
   })
 
-  offers.sort((a, b) => b.discount_percent - a.discount_percent)
+  offers.sort((a, b) => {
+    if (estimatedPrice !== null) {
+      return b.discount_amount - a.discount_amount
+    }
+    return b.discount_percent - a.discount_percent
+  })
   if (offers[0]) offers[0].recommended = true
 
   const bestOffer = offers[0] ?? null
@@ -171,21 +207,25 @@ export function buildFallbackResult(
     used_serper: false,
     data_sources: ["rules"],
     market_offers: [],
+    missing_card_teasers: [],
+    wallet_card_count: searchCards.filter((c) => c.source === "wallet").length,
+    circle_card_count: searchCards.filter((c) => c.source === "circle").length,
   }
 }
 
 export const DEAL_SEARCH_SYSTEM_PROMPT = `You are PoolPay, an Indian fintech deal optimizer for India.
-Given a purchase category, product/booking URL, pageHints, serperFindings (live Google search snippets), and ONLY the user's wallet credit cards, rank which card saves the most money.
+Given a purchase category, product/booking URL, pageHints, serperFindings (live Google search snippets), and searchCards (user wallet + trusted circle cards), rank which card saves the most money.
 
 Rules:
-- Only recommend cards present in walletCards. Never invent cards.
-- PRIORITIZE serperFindings.card_offer_snippets and serperFindings.shopping_results for live offer percentages when available.
+- Only recommend cards present in searchCards. Never invent cards.
+- searchCards includes source: "wallet" (user's own) or "circle" (trusted friend's card they can pool).
+- PRIORITIZE serperFindings.card_offer_snippets — when a snippet mentions a card, use that live percentage over generic guesses.
 - Use pageHints and serperFindings.product_snippets for product_title and estimated_price when URL scraping is weak.
-- Use realistic Indian bank/card offers (cashback, instant discount, EMI, lounge/travel perks).
+- Rank primarily by estimated rupee savings (discount_amount), not marketing fluff.
 - Prefer platform-native cards (e.g. ICICI Amazon Pay on Amazon, Axis Flipkart on Flipkart).
 - For flights/hotels, weigh travel rewards and OTA bank offers from serperFindings.
-- estimated_price may be null if unknown; still provide percentage guidance.
-- Cite specific offer details from serperFindings in each offer reason when possible.
+- Include owner_name in reason when source is circle (e.g. "Raj's HDFC Regalia via circle").
+- Return one offer row per searchCards entry (match card_id + owner_user_id when present).
 
 Return ONLY valid JSON:
 {
@@ -206,4 +246,4 @@ Return ONLY valid JSON:
   ],
   "summary": string
 }
-Exactly one offer must have recommended=true (the best wallet card).`
+Exactly one offer must have recommended=true (highest rupee savings when price known).`

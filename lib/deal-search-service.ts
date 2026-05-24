@@ -1,6 +1,10 @@
 import * as cheerio from "cheerio"
 import { call_ai, safeJsonExtract } from "@/lib/llm-router"
 import {
+  applySerperOverrides,
+  sortOffersStrict,
+} from "@/lib/deal-search-ranking"
+import {
   buildFallbackResult,
   DEAL_SEARCH_SYSTEM_PROMPT,
   detectPlatform,
@@ -9,8 +13,10 @@ import {
   type DealSearchCategory,
   type DealSearchResult,
   type MarketOffer,
+  type SearchCardInput,
   type WalletCardInput,
 } from "@/lib/deal-search"
+import { buildMissingCardTeasers } from "@/lib/deal-search-missing-cards"
 import {
   fetchSerperDealContext,
   type SerperDealContext,
@@ -19,6 +25,7 @@ import {
 type SearchRequestBody = {
   category?: string
   url?: string
+  searchCards?: SearchCardInput[]
   walletCards?: WalletCardInput[]
 }
 
@@ -31,8 +38,41 @@ type AiDealPayload = {
   product_title?: string
   platform?: string
   estimated_price?: number | null
-  offers?: DealOffer[]
+  offers?: Array<Partial<DealOffer> & { card_id: string }>
   summary?: string
+}
+
+function cardKey(card: { card_id: string; owner_user_id?: string }): string {
+  return `${card.card_id}:${card.owner_user_id ?? "self"}`
+}
+
+function countSearchCards(searchCards: SearchCardInput[]) {
+  return {
+    wallet_card_count: searchCards.filter((c) => c.source === "wallet").length,
+    circle_card_count: searchCards.filter((c) => c.source === "circle").length,
+  }
+}
+
+function toSearchCards(
+  walletCards: WalletCardInput[],
+  searchCards?: SearchCardInput[]
+): SearchCardInput[] {
+  if (Array.isArray(searchCards) && searchCards.length > 0) {
+    return searchCards.map((card) => ({
+      card_id: card.card_id,
+      bank_name: card.bank_name,
+      card_name: card.card_name,
+      source: card.source === "circle" ? "circle" : "wallet",
+      owner_user_id: card.owner_user_id,
+      owner_name: card.owner_name,
+    }))
+  }
+
+  return walletCards.map((card) => ({
+    ...card,
+    source: "wallet" as const,
+    owner_name: "You",
+  }))
 }
 
 function buildMarketOffersFromSerper(serper: SerperDealContext): MarketOffer[] {
@@ -132,75 +172,116 @@ async function fetchUrlHints(url: string): Promise<UrlHints> {
 }
 
 function normalizeOffers(
-  offers: DealOffer[] | undefined,
-  walletCards: WalletCardInput[],
+  aiOffers: AiDealPayload["offers"],
+  searchCards: SearchCardInput[],
   estimatedPrice: number | null,
   category: DealSearchCategory,
-  url: string
+  url: string,
+  serper: SerperDealContext
 ): DealOffer[] {
-  const walletById = new Map(walletCards.map((card) => [card.card_id, card]))
+  const aiByKey = new Map<string, Partial<DealOffer> & { card_id: string }>()
 
-  const normalized = (offers ?? [])
-    .filter((offer) => walletById.has(offer.card_id))
-    .map((offer) => {
-      const walletCard = walletById.get(offer.card_id)!
-      const discountPercent = Number(offer.discount_percent) || 0
-      const discountAmount =
-        estimatedPrice !== null
-          ? Math.round((estimatedPrice * discountPercent) / 100)
-          : Number(offer.discount_amount) || 0
-
-      return {
-        card_id: walletCard.card_id,
-        bank_name: walletCard.bank_name,
-        card_name: walletCard.card_name,
-        discount_percent: discountPercent,
-        discount_amount: discountAmount,
-        estimated_final_price:
-          estimatedPrice !== null
-            ? Math.max(estimatedPrice - discountAmount, 0)
-            : offer.estimated_final_price ?? null,
-        reason: offer.reason || "Wallet card offer",
-        recommended: Boolean(offer.recommended),
-      }
-    })
-
-  if (normalized.length === 0) {
-    return buildFallbackResult(category, url, walletCards, estimatedPrice).offers
+  for (const offer of aiOffers ?? []) {
+    if (!offer?.card_id) continue
+    aiByKey.set(cardKey(offer), offer)
+    if (!aiByKey.has(`${offer.card_id}:self`)) {
+      aiByKey.set(`${offer.card_id}:self`, offer)
+    }
   }
 
-  normalized.sort((a, b) => b.discount_percent - a.discount_percent)
-  return normalized.map((offer, index) => ({
-    ...offer,
-    recommended: index === 0,
-  }))
+  const fallbackOffers = buildFallbackResult(
+    category,
+    url,
+    searchCards,
+    estimatedPrice
+  ).offers
+  const fallbackByKey = new Map(
+    fallbackOffers.map((offer) => [cardKey(offer), offer])
+  )
+
+  const merged = searchCards.map((card) => {
+    const key = cardKey(card)
+    const ai = aiByKey.get(key) ?? aiByKey.get(`${card.card_id}:self`)
+    const fallback = fallbackByKey.get(key)
+
+    const discountPercent =
+      Number(ai?.discount_percent) || fallback?.discount_percent || 2
+    const discountAmount =
+      estimatedPrice !== null
+        ? Math.round((estimatedPrice * discountPercent) / 100)
+        : Number(ai?.discount_amount) || fallback?.discount_amount || 0
+
+    const base: DealOffer = {
+      card_id: card.card_id,
+      bank_name: card.bank_name,
+      card_name: card.card_name,
+      discount_percent: discountPercent,
+      discount_amount: discountAmount,
+      estimated_final_price:
+        estimatedPrice !== null
+          ? Math.max(estimatedPrice - discountAmount, 0)
+          : ai?.estimated_final_price ?? fallback?.estimated_final_price ?? null,
+      reason:
+        ai?.reason ||
+        fallback?.reason ||
+        (card.source === "circle"
+          ? `${card.owner_name ?? "Circle"}'s ${card.bank_name} ${card.card_name}`
+          : `${card.bank_name} ${card.card_name} wallet offer`),
+      recommended: false,
+      source: card.source,
+      owner_user_id: card.owner_user_id,
+      owner_name: card.owner_name,
+      serper_backed: false,
+    }
+
+    return applySerperOverrides(base, card, serper, estimatedPrice)
+  })
+
+  if (merged.length === 0) {
+    return fallbackOffers
+  }
+
+  return sortOffersStrict(merged, estimatedPrice)
 }
 
 function attachSerperMetadata(
   result: DealSearchResult,
   hints: UrlHints,
   serper: SerperDealContext,
-  usedAi: boolean
+  usedAi: boolean,
+  searchCards: SearchCardInput[],
+  sourceUrl: string
 ): DealSearchResult {
+  const counts = countSearchCards(searchCards)
+  const estimatedPrice =
+    result.estimated_price ?? serper.price ?? hints.price ?? null
+
   return {
     ...result,
+    ...counts,
     product_title:
       result.product_title ||
       serper.product_title ||
       hints.title ||
       "Linked purchase",
-    estimated_price:
-      result.estimated_price ?? serper.price ?? hints.price ?? null,
+    estimated_price: estimatedPrice,
     used_serper: serper.used_serper,
     data_sources: buildDataSources(hints, serper, usedAi),
     market_offers: buildMarketOffersFromSerper(serper),
+    missing_card_teasers: buildMissingCardTeasers({
+      url: sourceUrl,
+      estimatedPrice,
+      searchCards,
+      offers: result.offers,
+      serper,
+    }),
   }
 }
 
 function buildAiResult(
   category: DealSearchCategory,
   url: string,
-  walletCards: WalletCardInput[],
+  searchCards: SearchCardInput[],
   aiPayload: AiDealPayload,
   hints: UrlHints,
   serper: SerperDealContext
@@ -209,12 +290,19 @@ function buildAiResult(
     aiPayload.estimated_price ?? serper.price ?? hints.price ?? null
   const offers = normalizeOffers(
     aiPayload.offers,
-    walletCards,
+    searchCards,
     estimatedPrice,
     category,
-    url
+    url,
+    serper
   )
   const bestOffer = offers.find((offer) => offer.recommended) ?? offers[0] ?? null
+  const counts = countSearchCards(searchCards)
+
+  const ownerLabel =
+    bestOffer?.source === "circle" && bestOffer.owner_name
+      ? `${bestOffer.owner_name}'s `
+      : ""
 
   const base: DealSearchResult = {
     product_title:
@@ -231,21 +319,22 @@ function buildAiResult(
     summary:
       aiPayload.summary ||
       (bestOffer
-        ? `Best wallet pick: ${bestOffer.bank_name} ${bestOffer.card_name}.`
-        : "No wallet cards to compare."),
+        ? `Best pick: ${ownerLabel}${bestOffer.bank_name} ${bestOffer.card_name} saves ~₹${bestOffer.discount_amount.toLocaleString("en-IN")}.`
+        : "No cards to compare."),
     used_ai: true,
     used_serper: serper.used_serper,
     data_sources: buildDataSources(hints, serper, true),
     market_offers: buildMarketOffersFromSerper(serper),
+    ...counts,
   }
 
-  return attachSerperMetadata(base, hints, serper, true)
+  return attachSerperMetadata(base, hints, serper, true, searchCards, url)
 }
 
 export async function searchDealsForWallet(
   category: DealSearchCategory,
   url: string,
-  walletCards: WalletCardInput[]
+  searchCards: SearchCardInput[]
 ): Promise<DealSearchResult> {
   const platform = detectPlatform(url)
   const hints = await fetchUrlHints(url)
@@ -254,7 +343,7 @@ export async function searchDealsForWallet(
     url,
     platform,
     category,
-    walletCards,
+    walletCards: searchCards,
     existingTitle: hints.title,
     existingPrice: hints.price ?? null,
   })
@@ -270,7 +359,7 @@ export async function searchDealsForWallet(
       url,
       platform,
       pageHints: enrichedHints,
-      walletCards,
+      searchCards,
       serperFindings: {
         product_snippets: serper.product_snippets,
         card_offer_snippets: serper.card_offer_snippets,
@@ -287,7 +376,7 @@ export async function searchDealsForWallet(
     return buildAiResult(
       category,
       url,
-      walletCards,
+      searchCards,
       aiPayload,
       enrichedHints,
       serper
@@ -296,7 +385,7 @@ export async function searchDealsForWallet(
     const fallback = buildFallbackResult(
       category,
       url,
-      walletCards,
+      searchCards,
       enrichedHints.price ?? null
     )
 
@@ -304,18 +393,35 @@ export async function searchDealsForWallet(
       fallback.product_title = enrichedHints.title
     }
 
-    return attachSerperMetadata(fallback, enrichedHints, serper, false)
+    const offers = normalizeOffers(
+      undefined,
+      searchCards,
+      fallback.estimated_price,
+      category,
+      url,
+      serper
+    )
+    fallback.offers = offers
+    fallback.best_offer = offers.find((o) => o.recommended) ?? offers[0] ?? null
+
+    return attachSerperMetadata(
+      fallback,
+      enrichedHints,
+      serper,
+      false,
+      searchCards,
+      url
+    )
   }
 }
 
 export function parseSearchRequestBody(body: SearchRequestBody): {
   category: DealSearchCategory
   url: string
-  walletCards: WalletCardInput[]
+  searchCards: SearchCardInput[]
 } | { error: string } {
   const category = normalizeCategory(String(body.category ?? ""))
   const url = String(body.url ?? "").trim()
-  const walletCards = Array.isArray(body.walletCards) ? body.walletCards : []
 
   if (!category) {
     return { error: "Select a category: flight, hotels, or product." }
@@ -329,27 +435,29 @@ export function parseSearchRequestBody(body: SearchRequestBody): {
     return { error: "Enter a valid http or https URL." }
   }
 
-  if (walletCards.length === 0) {
-    return { error: "Add at least one card to your wallet first." }
-  }
+  const rawWallet = Array.isArray(body.walletCards) ? body.walletCards : []
+  const rawSearch = Array.isArray(body.searchCards) ? body.searchCards : []
 
-  const sanitizedCards = walletCards
-    .filter(
+  const searchCards = toSearchCards(
+    rawWallet.filter(
       (card) =>
         card &&
         typeof card.card_id === "string" &&
         typeof card.bank_name === "string" &&
         typeof card.card_name === "string"
-    )
-    .map((card) => ({
-      card_id: card.card_id,
-      bank_name: card.bank_name,
-      card_name: card.card_name,
-    }))
+    ),
+    rawSearch.filter(
+      (card) =>
+        card &&
+        typeof card.card_id === "string" &&
+        typeof card.bank_name === "string" &&
+        typeof card.card_name === "string"
+    ) as SearchCardInput[]
+  )
 
-  if (sanitizedCards.length === 0) {
-    return { error: "Wallet cards are invalid. Re-add cards in Wallet." }
+  if (searchCards.length === 0) {
+    return { error: "Add at least one card to your wallet first." }
   }
 
-  return { category, url, walletCards: sanitizedCards }
+  return { category, url, searchCards }
 }

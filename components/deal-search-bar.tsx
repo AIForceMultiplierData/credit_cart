@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAuth } from "@/hooks/useAuth"
-import { useWalletCards } from "@/hooks/useWalletCards"
+import { useDealSearchCards } from "@/hooks/useDealSearchCards"
 import type { DealSearchCategory, DealSearchResult } from "@/lib/deal-search"
+import { MissingCardTeasers } from "@/components/missing-card-teasers"
 import { cn } from "@/lib/utils"
 
 type DealSearchBarProps = {
@@ -65,7 +66,8 @@ export function DealSearchBar({
   onNeedSignIn,
 }: DealSearchBarProps) {
   const { user, loading: authLoading } = useAuth()
-  const { cards, loading: cardsLoading } = useWalletCards(user?.id)
+  const { searchCards, walletCount, circleCount, loading: cardsLoading } =
+    useDealSearchCards(user?.id)
   const [category, setCategory] = useState<DealSearchCategory>("product")
   const [url, setUrl] = useState("")
   const [searching, setSearching] = useState(false)
@@ -81,7 +83,7 @@ export function DealSearchBar({
       return
     }
 
-    if (cards.length === 0) {
+    if (searchCards.length === 0) {
       toast.error("Add a card first", {
         description: "Add cards to your wallet so we can find the best offer.",
       })
@@ -107,11 +109,7 @@ export function DealSearchBar({
         body: JSON.stringify({
           category,
           url: trimmedUrl,
-          walletCards: cards.map((card) => ({
-            card_id: card.card_id,
-            bank_name: card.bank_name,
-            card_name: card.card_name,
-          })),
+          searchCards,
         }),
       })
 
@@ -217,10 +215,10 @@ export function DealSearchBar({
           )}
         </Button>
 
-        {user && cards.length > 0 ? (
+        {user && searchCards.length > 0 ? (
           <p className="mt-2 text-center text-xs text-slate-500">
-            Comparing {cards.length} card{cards.length === 1 ? "" : "s"} in your
-            wallet
+            Comparing {walletCount} wallet + {circleCount} circle card
+            {walletCount + circleCount === 1 ? "" : "s"}
           </p>
         ) : user && !cardsLoading ? (
           <p className="mt-2 text-center text-xs text-amber-300/90">
@@ -262,7 +260,27 @@ export function DealSearchBar({
 
           {result.best_offer ? (
             <div className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    "rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                    result.best_offer.source === "circle"
+                      ? "bg-blue-500/20 text-blue-300"
+                      : "bg-emerald-500/20 text-emerald-300"
+                  )}
+                >
+                  {result.best_offer.source === "circle" ? "Circle" : "Wallet"}
+                </span>
+                {result.best_offer.serper_backed ? (
+                  <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-300">
+                    Serper verified
+                  </span>
+                ) : null}
+              </div>
               <p className="text-sm font-bold text-emerald-300">
+                {result.best_offer.source === "circle" && result.best_offer.owner_name
+                  ? `${result.best_offer.owner_name}'s `
+                  : ""}
                 {result.best_offer.bank_name} {result.best_offer.card_name}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-slate-300">
@@ -270,7 +288,10 @@ export function DealSearchBar({
               </p>
               <div className="mt-2 flex flex-wrap gap-3 text-xs">
                 <span className="text-emerald-400">
-                  ~{result.best_offer.discount_percent}% value back
+                  Save ~₹{result.best_offer.discount_amount.toLocaleString("en-IN")}
+                  {result.estimated_price !== null
+                    ? ` (${result.best_offer.discount_percent}%)`
+                    : ""}
                 </span>
                 {result.best_offer.estimated_final_price !== null ? (
                   <span className="text-slate-400">
@@ -279,6 +300,14 @@ export function DealSearchBar({
                 ) : null}
               </div>
             </div>
+          ) : null}
+
+          {result.missing_card_teasers?.length ? (
+            <MissingCardTeasers
+              teasers={result.missing_card_teasers}
+              estimatedPrice={result.estimated_price}
+              onNeedSignIn={onNeedSignIn}
+            />
           ) : null}
 
           <p className="mb-3 text-sm text-slate-400">{result.summary}</p>
@@ -310,11 +339,11 @@ export function DealSearchBar({
           {result.offers.length > 1 ? (
             <div className="space-y-2 border-t border-slate-800/60 pt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                All wallet cards
+                All cards (wallet + circle)
               </p>
               {result.offers.map((offer) => (
                 <div
-                  key={offer.card_id}
+                  key={`${offer.card_id}:${offer.owner_user_id ?? "self"}`}
                   className={cn(
                     "flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs",
                     offer.recommended
@@ -322,10 +351,18 @@ export function DealSearchBar({
                       : "text-slate-400"
                   )}
                 >
-                  <span>
-                    {offer.bank_name} {offer.card_name}
-                  </span>
-                  <span>~{offer.discount_percent}%</span>
+                <span>
+                  {offer.source === "circle" && offer.owner_name
+                    ? `${offer.owner_name}: `
+                    : ""}
+                  {offer.bank_name} {offer.card_name}
+                  {offer.serper_backed ? " ✓" : ""}
+                </span>
+                <span>
+                  {result.estimated_price !== null
+                    ? `₹${offer.discount_amount.toLocaleString("en-IN")}`
+                    : `~${offer.discount_percent}%`}
+                </span>
                 </div>
               ))}
             </div>
