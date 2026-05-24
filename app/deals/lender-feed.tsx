@@ -38,6 +38,51 @@ export type LendingOpportunity = ContractRow & {
 
 type AcceptingState = Record<string, boolean>
 
+function getSupabaseErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "message" in err) {
+    return String((err as { message: string }).message)
+  }
+  return fallback
+}
+
+async function fetchTrustScores(
+  buyerIds: string[]
+): Promise<Map<string, number>> {
+  if (buyerIds.length === 0) {
+    return new Map()
+  }
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "get_trust_scores",
+    { p_user_ids: buyerIds }
+  )
+
+  if (!rpcError && Array.isArray(rpcData)) {
+    return new Map(
+      (rpcData as ProfileTrustRow[]).map((profile) => [
+        profile.id,
+        toNumber(profile.trust_score) || 100,
+      ])
+    )
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, trust_score")
+    .in("id", buyerIds)
+
+  if (profilesError) {
+    return new Map(buyerIds.map((id) => [id, 100]))
+  }
+
+  return new Map(
+    ((profiles ?? []) as ProfileTrustRow[]).map((profile) => [
+      profile.id,
+      toNumber(profile.trust_score) || 100,
+    ])
+  )
+}
+
 function toNumber(value: unknown): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
@@ -108,7 +153,6 @@ export async function acceptDeal(
     .update({
       lender_id: lenderId,
       escrow_status: "escrow_locked",
-      updated_at: new Date().toISOString(),
     })
     .eq("id", contractId)
     .eq("escrow_status", "pending_acceptance")
@@ -151,16 +195,38 @@ export function LenderFeed() {
 
     try {
       const { data: contracts, error: contractsError } = await supabase
-        .from("contracts")
+        .from("lender_opportunities")
         .select(
           "id, buyer_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
         )
-        .eq("escrow_status", "pending_acceptance")
         .neq("buyer_id", user.id)
         .order("created_at", { ascending: false })
 
       if (contractsError) {
-        throw contractsError
+        const fallback = await supabase
+          .from("contracts")
+          .select(
+            "id, buyer_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
+          )
+          .eq("escrow_status", "pending_acceptance")
+          .neq("buyer_id", user.id)
+          .order("created_at", { ascending: false })
+
+        if (fallback.error) {
+          throw fallback.error
+        }
+
+        const rows = (fallback.data ?? []) as ContractRow[]
+
+        if (rows.length === 0) {
+          setOpportunities([])
+          return
+        }
+
+        const buyerIds = [...new Set(rows.map((row) => row.buyer_id))]
+        const trustByBuyerId = await fetchTrustScores(buyerIds)
+        setOpportunities(rows.map((row) => mapOpportunity(row, trustByBuyerId)))
+        return
       }
 
       const rows = (contracts ?? []) as ContractRow[]
@@ -171,29 +237,20 @@ export function LenderFeed() {
       }
 
       const buyerIds = [...new Set(rows.map((row) => row.buyer_id))]
-
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, trust_score")
-        .in("id", buyerIds)
-
-      if (profilesError) {
-        throw profilesError
-      }
-
-      const trustByBuyerId = new Map<string, number>(
-        ((profiles ?? []) as ProfileTrustRow[]).map((profile) => [
-          profile.id,
-          toNumber(profile.trust_score),
-        ])
-      )
+      const trustByBuyerId = await fetchTrustScores(buyerIds)
 
       setOpportunities(rows.map((row) => mapOpportunity(row, trustByBuyerId)))
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to load lending opportunities."
+      let message = getSupabaseErrorMessage(
+        err,
+        "Failed to load lending opportunities."
+      )
+      if (
+        /does not exist|relation|permission denied/i.test(message)
+      ) {
+        message =
+          "Run supabase/contracts.sql and supabase/lender_feed_fix.sql in the Supabase SQL Editor, then refresh."
+      }
       toast.error("Could not load opportunities", { description: message })
       setOpportunities([])
     } finally {
