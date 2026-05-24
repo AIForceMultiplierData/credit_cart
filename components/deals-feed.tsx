@@ -1,6 +1,6 @@
 "use client"
 
-import { Zap, TrendingDown, Clock, Users } from "lucide-react"
+import { Zap, TrendingDown, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface Deal {
@@ -10,9 +10,9 @@ export interface Deal {
   discountedPrice: number
   cardName: string
   cardDiscount: number
-  poolSize: number
   timeLeft: string
   image?: string
+  isDemo?: boolean
 }
 
 const mockDeals: Deal[] = [
@@ -23,8 +23,8 @@ const mockDeals: Deal[] = [
     discountedPrice: 75000,
     cardName: "HDFC",
     cardDiscount: 5000,
-    poolSize: 3,
     timeLeft: "2h 30m",
+    isDemo: true,
   },
   {
     id: "2",
@@ -33,8 +33,8 @@ const mockDeals: Deal[] = [
     discountedPrice: 22990,
     cardName: "ICICI",
     cardDiscount: 2000,
-    poolSize: 5,
     timeLeft: "4h 15m",
+    isDemo: true,
   },
   {
     id: "3",
@@ -43,18 +43,18 @@ const mockDeals: Deal[] = [
     discountedPrice: 139900,
     cardName: "SBI",
     cardDiscount: 10000,
-    poolSize: 2,
     timeLeft: "1h 45m",
+    isDemo: true,
   },
   {
     id: "4",
-    title: "Samsung 65\" OLED TV",
+    title: 'Samsung 65" OLED TV',
     originalPrice: 189990,
     discountedPrice: 159990,
     cardName: "Axis",
     cardDiscount: 15000,
-    poolSize: 4,
     timeLeft: "5h 00m",
+    isDemo: true,
   },
   {
     id: "5",
@@ -63,8 +63,8 @@ const mockDeals: Deal[] = [
     discountedPrice: 44990,
     cardName: "HDFC",
     cardDiscount: 5000,
-    poolSize: 6,
     timeLeft: "3h 20m",
+    isDemo: true,
   },
 ]
 
@@ -87,7 +87,7 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
           Pool Cards. Unlock Deals.
         </h1>
         <p className="text-slate-400 text-sm mt-1">
-          Tap a deal to ping your circle
+          Sample deals below — tap to ping your circle
         </p>
       </div>
 
@@ -112,9 +112,16 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
               {/* Top Row */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-slate-50 font-semibold text-lg leading-tight truncate group-hover:text-emerald-400 transition-colors">
-                    {deal.title}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-slate-50 font-semibold text-lg leading-tight truncate group-hover:text-emerald-400 transition-colors">
+                      {deal.title}
+                    </h3>
+                    {deal.isDemo ? (
+                      <span className="shrink-0 rounded-md border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Demo
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-slate-500 line-through text-sm">
                       ₹{deal.originalPrice.toLocaleString()}
@@ -143,15 +150,9 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
 
               {/* Bottom Row */}
               <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/50">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>{deal.poolSize} in pool</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-400 text-sm">
-                    <Clock className="w-4 h-4" />
-                    <span>{deal.timeLeft}</span>
-                  </div>
+                <div className="flex items-center gap-1.5 text-slate-400 text-sm">
+                  <Clock className="w-4 h-4" />
+                  <span>{deal.timeLeft}</span>
                 </div>
                 <div className="text-xs text-emerald-400 font-medium uppercase tracking-wide">
                   Tap to Ping →

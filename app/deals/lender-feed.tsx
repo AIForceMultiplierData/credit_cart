@@ -183,15 +183,18 @@ export function LenderFeed() {
   const [opportunities, setOpportunities] = useState<LendingOpportunity[]>([])
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState<AcceptingState>({})
+  const [loadHint, setLoadHint] = useState<string | null>(null)
 
   const fetchOpportunities = useCallback(async () => {
     if (!user) {
       setOpportunities([])
+      setLoadHint(null)
       setLoading(false)
       return
     }
 
     setLoading(true)
+    setLoadHint(null)
 
     try {
       const { data: contracts, error: contractsError } = await supabase
@@ -241,17 +244,17 @@ export function LenderFeed() {
 
       setOpportunities(rows.map((row) => mapOpportunity(row, trustByBuyerId)))
     } catch (err) {
-      let message = getSupabaseErrorMessage(
+      const message = getSupabaseErrorMessage(
         err,
         "Failed to load lending opportunities."
       )
-      if (
-        /does not exist|relation|permission denied/i.test(message)
-      ) {
-        message =
-          "Run supabase/contracts.sql and supabase/lender_feed_fix.sql in the Supabase SQL Editor, then refresh."
+      if (/does not exist|relation|permission denied|PGRST/i.test(message)) {
+        setLoadHint(
+          "Lender feed needs Supabase setup. Run supabase/contracts.sql and supabase/lender_feed_fix.sql in the SQL Editor."
+        )
+      } else {
+        setLoadHint(message)
       }
-      toast.error("Could not load opportunities", { description: message })
       setOpportunities([])
     } finally {
       setLoading(false)
@@ -333,6 +336,11 @@ export function LenderFeed() {
           <p className="mt-1 text-sm text-slate-500">
             When buyers ping the circle, deals will appear here.
           </p>
+          {loadHint ? (
+            <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-left text-xs leading-relaxed text-amber-200/90">
+              {loadHint}
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">

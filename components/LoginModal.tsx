@@ -5,10 +5,11 @@ import { Lock, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type LoginModalProps = {
-  open: boolean;
-};
+  open: boolean
+  onOpenChange?: (open: boolean) => void
+}
 
-export function LoginModal({ open }: LoginModalProps) {
+export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

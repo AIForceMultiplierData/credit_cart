@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         oauthReturnRef.current = false
 
         toast.success(`Welcome, ${getWelcomeName(nextSession.user)}!`, {
-          description: "You're signed in to PoolPay.",
+          description: "You're signed in. Tap your avatar to edit your profile.",
         })
 
         clearOAuthCallbackFromUrl()

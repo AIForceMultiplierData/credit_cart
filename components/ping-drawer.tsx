@@ -6,7 +6,6 @@ import {
   CreditCard,
   Loader2,
   Minus,
-  Plus,
   Radio,
   Send,
   ShieldCheck,
@@ -21,6 +20,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useAuth } from "@/hooks/useAuth"
+import { useProfile } from "@/hooks/useProfile"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
@@ -56,6 +56,7 @@ function mapDealToPingData(deal: Deal): DealPingData {
 
 export function PingDrawer({ deal, open, onOpenChange }: PingDrawerProps) {
   const { user, loading: authLoading } = useAuth()
+  const { circleMembers, circleCount, loading: profileLoading } = useProfile()
   const [pingState, setPingState] = useState<PingUiState>("idle")
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
@@ -185,26 +186,49 @@ export function PingDrawer({ deal, open, onOpenChange }: PingDrawerProps) {
             </div>
           </div>
 
-          <div className="mb-6 flex items-center justify-center gap-2 text-sm text-slate-400">
-            <div className="flex -space-x-2">
-              {[...Array(3)].map((_, index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 text-xs font-bold",
-                    index === 0 && "bg-gradient-to-br from-purple-500 to-pink-500",
-                    index === 1 && "bg-gradient-to-br from-blue-500 to-cyan-500",
-                    index === 2 && "bg-gradient-to-br from-emerald-500 to-teal-500"
-                  )}
-                >
-                  {["R", "P", "A"][index]}
+          <div className="mb-6 flex flex-col items-center gap-2 text-sm text-slate-400">
+            {profileLoading ? (
+              <p>Loading circle…</p>
+            ) : circleCount === 0 ? (
+              <>
+                <p className="text-center text-slate-400">
+                  No circle members yet
+                </p>
+                <p className="text-center text-xs text-slate-500">
+                  Invite friends from Wallet before pinging a deal.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex -space-x-2">
+                  {circleMembers.slice(0, 4).map((member, index) => (
+                    <div
+                      key={`${member.name}-${index}`}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 text-xs font-bold",
+                        index % 3 === 0 &&
+                          "bg-gradient-to-br from-purple-500 to-pink-500",
+                        index % 3 === 1 &&
+                          "bg-gradient-to-br from-blue-500 to-cyan-500",
+                        index % 3 === 2 &&
+                          "bg-gradient-to-br from-emerald-500 to-teal-500"
+                      )}
+                    >
+                      {member.initial}
+                    </div>
+                  ))}
+                  {circleCount > 4 ? (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 bg-slate-700 text-xs font-bold text-slate-300">
+                      +{circleCount - 4}
+                    </div>
+                  ) : null}
                 </div>
-              ))}
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 bg-slate-700">
-                <Plus className="h-4 w-4 text-slate-400" />
-              </div>
-            </div>
-            <span>3 members will be notified</span>
+                <span>
+                  {circleCount} member{circleCount === 1 ? "" : "s"} will be
+                  notified
+                </span>
+              </>
+            )}
           </div>
 
           {statusMessage ? (

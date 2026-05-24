@@ -9,7 +9,10 @@ import { WalletView } from "@/components/wallet-view"
 import { ActivityView } from "@/components/activity-view"
 import { PingDrawer } from "@/components/ping-drawer"
 import { LoginModal } from "@/components/LoginModal"
+import { ProfileMenu } from "@/components/profile-menu"
+import { ProfileEditModal } from "@/components/profile-edit-modal"
 import { useAuth } from "@/hooks/useAuth"
+import { useProfile } from "@/hooks/useProfile"
 
 type TabType = "home" | "wallet" | "deals" | "activity"
 
@@ -17,10 +20,14 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabType>("home")
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [loginOpen, setLoginOpen] = useState(false)
+  const [profileEditOpen, setProfileEditOpen] = useState(false)
   const { user, loading } = useAuth()
+  const { profile, refresh: refreshProfile } = useProfile()
 
   const requiresAuth = activeTab === "wallet" || activeTab === "activity"
-  const showLoginModal = requiresAuth && !loading && !user
+  const showLoginModal =
+    (requiresAuth && !loading && !user) || (loginOpen && !user)
 
   const handleDealClick = (deal: Deal) => {
     setSelectedDeal(deal)
@@ -30,11 +37,6 @@ export default function HomePage() {
   const handleNavigate = (tab: TabType) => {
     setActiveTab(tab)
   }
-
-  const userInitial =
-    user?.user_metadata?.full_name?.[0] ??
-    user?.email?.[0] ??
-    "?"
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -49,11 +51,13 @@ export default function HomePage() {
               </div>
               <span className="text-slate-50 font-bold text-lg">PoolPay</span>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
-                {userInitial}
-              </div>
-            </div>
+            <ProfileMenu
+              user={user}
+              displayName={profile?.fullName}
+              loading={loading}
+              onEditProfile={() => setProfileEditOpen(true)}
+              onSignIn={() => setLoginOpen(true)}
+            />
           </div>
         </div>
 
@@ -80,7 +84,19 @@ export default function HomePage() {
           onOpenChange={setDrawerOpen}
         />
 
-        <LoginModal open={showLoginModal} />
+        <LoginModal
+          open={showLoginModal}
+          onOpenChange={(open) => {
+            if (!open) setLoginOpen(false)
+          }}
+        />
+
+        <ProfileEditModal
+          open={profileEditOpen}
+          onOpenChange={setProfileEditOpen}
+          initialName={profile?.fullName ?? ""}
+          onSaved={() => void refreshProfile()}
+        />
       </div>
     </div>
   )
