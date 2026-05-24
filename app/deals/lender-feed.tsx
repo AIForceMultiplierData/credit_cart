@@ -47,6 +47,74 @@ function getSupabaseErrorMessage(err: unknown, fallback: string): string {
   return fallback
 }
 
+function isSchemaMissingError(message: string): boolean {
+  return /does not exist|could not find|schema cache|PGRST204|PGRST205|42P01|relation.*contracts/i.test(
+    message
+  )
+}
+
+function isPermissionError(message: string): boolean {
+  return /permission denied|42501|row-level security|insufficient privilege/i.test(
+    message
+  )
+}
+
+function lenderFeedLoadHint(message: string): string {
+  if (isSchemaMissingError(message)) {
+    return "Lender feed tables are missing. Run supabase/contracts.sql and supabase/lender_feed_fix.sql in the SQL Editor."
+  }
+  if (isPermissionError(message)) {
+    return "Tables exist but access is blocked. Re-run supabase/lender_feed_fix.sql (section 5 adds get_lender_opportunities RPC), then refresh the page."
+  }
+  return message
+}
+
+async function loadContractRows(
+  userId: string
+): Promise<{ rows: ContractRow[]; error: string | null }> {
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "get_lender_opportunities"
+  )
+
+  if (!rpcError) {
+    return { rows: (rpcData ?? []) as ContractRow[], error: null }
+  }
+
+  const rpcMessage = getSupabaseErrorMessage(rpcError, "RPC failed")
+
+  if (!/does not exist|could not find|PGRST202|42883/i.test(rpcMessage)) {
+    return { rows: [], error: rpcMessage }
+  }
+
+  const { data: viewData, error: viewError } = await supabase
+    .from("lender_opportunities")
+    .select(
+      "id, buyer_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
+    )
+    .neq("buyer_id", userId)
+    .order("created_at", { ascending: false })
+
+  if (!viewError) {
+    return { rows: (viewData ?? []) as ContractRow[], error: null }
+  }
+
+  const { data: tableData, error: tableError } = await supabase
+    .from("contracts")
+    .select(
+      "id, buyer_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
+    )
+    .eq("escrow_status", "pending_acceptance")
+    .neq("buyer_id", userId)
+    .order("created_at", { ascending: false })
+
+  if (!tableError) {
+    return { rows: (tableData ?? []) as ContractRow[], error: null }
+  }
+
+  const tableMessage = getSupabaseErrorMessage(tableError, "Query failed")
+  return { rows: [], error: tableMessage || rpcMessage }
+}
+
 async function fetchTrustScores(
   buyerIds: string[]
 ): Promise<Map<string, number>> {
@@ -201,42 +269,13 @@ export function LenderFeed() {
     setLoadHint(null)
 
     try {
-      const { data: contracts, error: contractsError } = await supabase
-        .from("lender_opportunities")
-        .select(
-          "id, buyer_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
-        )
-        .neq("buyer_id", user.id)
-        .order("created_at", { ascending: false })
+      const { rows, error: loadError } = await loadContractRows(user.id)
 
-      if (contractsError) {
-        const fallback = await supabase
-          .from("contracts")
-          .select(
-            "id, buyer_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
-          )
-          .eq("escrow_status", "pending_acceptance")
-          .neq("buyer_id", user.id)
-          .order("created_at", { ascending: false })
-
-        if (fallback.error) {
-          throw fallback.error
-        }
-
-        const rows = (fallback.data ?? []) as ContractRow[]
-
-        if (rows.length === 0) {
-          setOpportunities([])
-          return
-        }
-
-        const buyerIds = [...new Set(rows.map((row) => row.buyer_id))]
-        const trustByBuyerId = await fetchTrustScores(buyerIds)
-        setOpportunities(rows.map((row) => mapOpportunity(row, trustByBuyerId)))
+      if (loadError) {
+        setLoadHint(lenderFeedLoadHint(loadError))
+        setOpportunities([])
         return
       }
-
-      const rows = (contracts ?? []) as ContractRow[]
 
       if (rows.length === 0) {
         setOpportunities([])
@@ -252,13 +291,7 @@ export function LenderFeed() {
         err,
         "Failed to load lending opportunities."
       )
-      if (/does not exist|relation|permission denied|PGRST/i.test(message)) {
-        setLoadHint(
-          "Lender feed needs Supabase setup. Run supabase/contracts.sql and supabase/lender_feed_fix.sql in the SQL Editor."
-        )
-      } else {
-        setLoadHint(message)
-      }
+      setLoadHint(lenderFeedLoadHint(message))
       setOpportunities([])
     } finally {
       setLoading(false)
@@ -358,7 +391,11 @@ export function LenderFeed() {
             <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-left text-xs leading-relaxed text-amber-200/90">
               {loadHint}
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-3 text-xs text-slate-600">
+              Lender Desk is connected — waiting for buyer pings in your circle.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-4">

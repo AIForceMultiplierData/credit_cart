@@ -25,6 +25,22 @@ export type DealOffer = {
   owner_user_id?: string
   owner_name?: string
   serper_backed?: boolean
+  /** List / MRP price used for calculation */
+  list_price?: number | null
+  /** Exact amount charged at checkout after card discount */
+  amount_to_pay?: number | null
+  /** Issuer terms to avail the quoted discount */
+  terms_and_conditions?: string[]
+  /** Whether spend meets min transaction rules */
+  qualifies?: boolean
+  qualification_note?: string
+  /** Circle pool: your half of cashback */
+  your_cashback_share?: number | null
+  /** Circle pool: card owner's half */
+  circle_owner_share?: number | null
+  /** Your true cost after cashback (100% wallet, 50% circle) */
+  effective_cost?: number | null
+  is_pooled?: boolean
 }
 
 export type DealSearchResult = {
@@ -226,6 +242,9 @@ Rules:
 - For flights/hotels, weigh travel rewards and OTA bank offers from serperFindings.
 - Include owner_name in reason when source is circle (e.g. "Raj's HDFC Regalia via circle").
 - Return one offer row per searchCards entry (match card_id + owner_user_id when present).
+- For each offer include terms_and_conditions: string[] with ALL key conditions to avail the discount (caps, min spend, merchant restrictions, posting timeline).
+- discount_amount and estimated_final_price must be exact INR math from estimated_price × discount_percent, respecting caps you know.
+- When source is "circle", note in terms that PoolPay splits cashback 50/50 with the card owner.
 
 Return ONLY valid JSON:
 {
@@ -241,7 +260,8 @@ Return ONLY valid JSON:
       "discount_amount": number,
       "estimated_final_price": number | null,
       "reason": string,
-      "recommended": boolean
+      "recommended": boolean,
+      "terms_and_conditions": string[]
     }
   ],
   "summary": string

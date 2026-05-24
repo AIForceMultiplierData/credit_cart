@@ -22,6 +22,8 @@ import {
 import { useAuth } from "@/hooks/useAuth"
 import { useDealSearchCards } from "@/hooks/useDealSearchCards"
 import type { DealSearchCategory, DealSearchResult } from "@/lib/deal-search"
+import { DealOfferDetail } from "@/components/deal-offer-detail"
+import { formatInr } from "@/lib/deal-offer-breakdown"
 import { MissingCardTeasers } from "@/components/missing-card-teasers"
 import { cn } from "@/lib/utils"
 
@@ -55,11 +57,6 @@ const CATEGORY_OPTIONS: Array<{
     placeholder: "Paste Amazon / Flipkart product URL…",
   },
 ]
-
-function formatInr(amount: number | null): string {
-  if (amount === null) return "—"
-  return `₹${amount.toLocaleString("en-IN")}`
-}
 
 export function DealSearchBar({
   onNeedWallet,
@@ -151,8 +148,9 @@ export function DealSearchBar({
           </p>
         </div>
         <p className="mb-4 text-xs leading-relaxed text-slate-400">
-          Pick a category, paste any booking or product URL, and we&apos;ll rank
-          which card in your wallet saves the most.
+          Pick a category, paste any booking or product URL — we rank wallet +
+          circle cards with exact ₹ off, pay amount, T&amp;C, and 50/50 split
+          when pooling.
         </p>
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -243,7 +241,7 @@ export function DealSearchBar({
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                Best for your wallet
+                Best card — exact ₹ breakdown
               </p>
               <h3 className="mt-1 truncate text-base font-bold text-slate-50">
                 {result.product_title}
@@ -270,46 +268,8 @@ export function DealSearchBar({
           </div>
 
           {result.best_offer ? (
-            <div className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
-              <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    "rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase",
-                    result.best_offer.source === "circle"
-                      ? "bg-blue-500/20 text-blue-300"
-                      : "bg-emerald-500/20 text-emerald-300"
-                  )}
-                >
-                  {result.best_offer.source === "circle" ? "Circle" : "Wallet"}
-                </span>
-                {result.best_offer.serper_backed ? (
-                  <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-300">
-                    Serper verified
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-sm font-bold text-emerald-300">
-                {result.best_offer.source === "circle" && result.best_offer.owner_name
-                  ? `${result.best_offer.owner_name}'s `
-                  : ""}
-                {result.best_offer.bank_name} {result.best_offer.card_name}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-300">
-                {result.best_offer.reason}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                <span className="text-emerald-400">
-                  Save ~₹{result.best_offer.discount_amount.toLocaleString("en-IN")}
-                  {result.estimated_price !== null
-                    ? ` (${result.best_offer.discount_percent}%)`
-                    : ""}
-                </span>
-                {result.best_offer.estimated_final_price !== null ? (
-                  <span className="text-slate-400">
-                    Pay ~{formatInr(result.best_offer.estimated_final_price)}
-                  </span>
-                ) : null}
-              </div>
+            <div className="mb-3">
+              <DealOfferDetail offer={result.best_offer} highlight />
             </div>
           ) : null}
 
@@ -348,7 +308,7 @@ export function DealSearchBar({
           ) : null}
 
           {result.offers.length > 1 ? (
-            <div className="space-y-2 border-t border-slate-800/60 pt-3">
+            <div className="space-y-3 border-t border-slate-800/60 pt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 All cards (wallet + circle)
               </p>
@@ -356,24 +316,13 @@ export function DealSearchBar({
                 <div
                   key={`${offer.card_id}:${offer.owner_user_id ?? "self"}`}
                   className={cn(
-                    "flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs",
+                    "rounded-xl border p-3",
                     offer.recommended
-                      ? "bg-emerald-500/10 text-emerald-200"
-                      : "text-slate-400"
+                      ? "border-emerald-500/30 bg-emerald-500/5"
+                      : "border-slate-800/50 bg-slate-950/20"
                   )}
                 >
-                <span>
-                  {offer.source === "circle" && offer.owner_name
-                    ? `${offer.owner_name}: `
-                    : ""}
-                  {offer.bank_name} {offer.card_name}
-                  {offer.serper_backed ? " ✓" : ""}
-                </span>
-                <span>
-                  {result.estimated_price !== null
-                    ? `₹${offer.discount_amount.toLocaleString("en-IN")}`
-                    : `~${offer.discount_percent}%`}
-                </span>
+                  <DealOfferDetail offer={offer} compact />
                 </div>
               ))}
             </div>

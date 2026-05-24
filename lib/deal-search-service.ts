@@ -17,6 +17,7 @@ import {
   type WalletCardInput,
 } from "@/lib/deal-search"
 import { buildMissingCardTeasers } from "@/lib/deal-search-missing-cards"
+import { enrichDealSearchResult } from "@/lib/deal-offer-breakdown"
 import {
   fetchSerperDealContext,
   type SerperDealContext,
@@ -232,6 +233,9 @@ function normalizeOffers(
       owner_user_id: card.owner_user_id,
       owner_name: card.owner_name,
       serper_backed: false,
+      terms_and_conditions: Array.isArray(ai?.terms_and_conditions)
+        ? ai.terms_and_conditions.filter((t): t is string => typeof t === "string")
+        : undefined,
     }
 
     return applySerperOverrides(base, card, serper, estimatedPrice)
@@ -328,7 +332,17 @@ function buildAiResult(
     ...counts,
   }
 
-  return attachSerperMetadata(base, hints, serper, true, searchCards, url)
+  return finalizeSearchResult(
+    attachSerperMetadata(base, hints, serper, true, searchCards, url),
+    url
+  )
+}
+
+function finalizeSearchResult(
+  result: DealSearchResult,
+  url: string
+): DealSearchResult {
+  return enrichDealSearchResult(result, url)
 }
 
 export async function searchDealsForWallet(
@@ -404,12 +418,15 @@ export async function searchDealsForWallet(
     fallback.offers = offers
     fallback.best_offer = offers.find((o) => o.recommended) ?? offers[0] ?? null
 
-    return attachSerperMetadata(
-      fallback,
-      enrichedHints,
-      serper,
-      false,
-      searchCards,
+    return finalizeSearchResult(
+      attachSerperMetadata(
+        fallback,
+        enrichedHints,
+        serper,
+        false,
+        searchCards,
+        url
+      ),
       url
     )
   }
