@@ -2,6 +2,16 @@
 -- Fixes: "new row violates row-level security policy for table profiles"
 
 -- ---------------------------------------------------------------------------
+-- 0) Ensure required columns exist on profiles
+-- ---------------------------------------------------------------------------
+
+alter table public.profiles
+  add column if not exists cards jsonb not null default '[]'::jsonb;
+
+alter table public.profiles
+  add column if not exists updated_at timestamptz not null default now();
+
+-- ---------------------------------------------------------------------------
 -- 1) Table policies (defense in depth)
 -- ---------------------------------------------------------------------------
 
@@ -67,11 +77,10 @@ begin
     raise exception 'Not authenticated';
   end if;
 
-  insert into public.profiles (id, cards, updated_at)
-  values (uid, coalesce(p_cards, '[]'::jsonb), now())
+  insert into public.profiles (id, cards)
+  values (uid, coalesce(p_cards, '[]'::jsonb))
   on conflict (id) do update
-    set cards = excluded.cards,
-        updated_at = excluded.updated_at;
+    set cards = excluded.cards;
 
   select cards into wallet from public.profiles where id = uid;
   return coalesce(wallet, '[]'::jsonb);
