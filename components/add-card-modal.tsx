@@ -27,6 +27,7 @@ export type WalletCardRecord = {
   bank_name: string
   card_name: string
   style_classes: string
+  active_for_lending: boolean
 }
 
 type CardCatalogSelect = Pick<
@@ -196,6 +197,7 @@ export function AddCardModal({
         bank_name: selectedCard.bank_name,
         card_name: selectedCard.card_name,
         style_classes: selectedCard.style_classes,
+        active_for_lending: false,
       })
       onOpenChange(false)
     } catch {

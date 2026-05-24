@@ -12,7 +12,9 @@ import {
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/useAuth"
+import { useWalletCards } from "@/hooks/useWalletCards"
 import { supabase } from "@/lib/supabase"
+import { countLendingActiveCards } from "@/lib/wallet-cards"
 import { cn } from "@/lib/utils"
 
 type ContractRow = {
@@ -180,6 +182,8 @@ export async function acceptDeal(
 
 export function LenderFeed() {
   const { user, loading: authLoading } = useAuth()
+  const { cards: walletCards } = useWalletCards(user?.id)
+  const lendingActiveCount = countLendingActiveCards(walletCards)
   const [opportunities, setOpportunities] = useState<LendingOpportunity[]>([])
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState<AcceptingState>({})
@@ -274,6 +278,14 @@ export function LenderFeed() {
       return
     }
 
+    if (lendingActiveCount === 0) {
+      toast.error("Start Earning required", {
+        description:
+          "Turn on Start Earning for at least one wallet card before accepting deals.",
+      })
+      return
+    }
+
     setAccepting((current) => ({ ...current, [contractId]: true }))
 
     try {
@@ -336,6 +348,12 @@ export function LenderFeed() {
           <p className="mt-1 text-sm text-slate-500">
             When buyers ping the circle, deals will appear here.
           </p>
+          {lendingActiveCount === 0 ? (
+            <p className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200/90">
+              Go to Wallet and toggle <strong>Start Earning</strong> (green) on
+              a card to become eligible as a lender.
+            </p>
+          ) : null}
           {loadHint ? (
             <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-left text-xs leading-relaxed text-amber-200/90">
               {loadHint}

@@ -11,6 +11,24 @@ const LEGACY_BANK_STYLES: Record<string, string> = {
 const DEFAULT_CARD_STYLE =
   "bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200"
 
+function parseActiveForLending(value: unknown): boolean {
+  if (typeof value === "boolean") return value
+  if (value === "yes" || value === "true" || value === 1 || value === "1") {
+    return true
+  }
+  return false
+}
+
+function withLendingFlag(
+  card: Omit<WalletCardRecord, "active_for_lending">,
+  row: Record<string, unknown>
+): WalletCardRecord {
+  return {
+    ...card,
+    active_for_lending: parseActiveForLending(row.active_for_lending),
+  }
+}
+
 export function normalizeWalletCard(item: unknown): WalletCardRecord | null {
   if (typeof item !== "object" || item === null) return null
   const row = item as Record<string, unknown>
@@ -20,15 +38,18 @@ export function normalizeWalletCard(item: unknown): WalletCardRecord | null {
     typeof row.bank_name === "string" &&
     typeof row.card_name === "string"
   ) {
-    return {
-      card_id: row.card_id,
-      bank_name: row.bank_name,
-      card_name: row.card_name,
-      style_classes:
-        typeof row.style_classes === "string"
-          ? row.style_classes
-          : DEFAULT_CARD_STYLE,
-    }
+    return withLendingFlag(
+      {
+        card_id: row.card_id,
+        bank_name: row.bank_name,
+        card_name: row.card_name,
+        style_classes:
+          typeof row.style_classes === "string"
+            ? row.style_classes
+            : DEFAULT_CARD_STYLE,
+      },
+      row
+    )
   }
 
   if (
@@ -37,12 +58,15 @@ export function normalizeWalletCard(item: unknown): WalletCardRecord | null {
     typeof row.name === "string" &&
     typeof row.style === "string"
   ) {
-    return {
-      card_id: row.id,
-      bank_name: row.bank,
-      card_name: row.name,
-      style_classes: row.style,
-    }
+    return withLendingFlag(
+      {
+        card_id: row.id,
+        bank_name: row.bank,
+        card_name: row.name,
+        style_classes: row.style,
+      },
+      row
+    )
   }
 
   if (
@@ -50,12 +74,15 @@ export function normalizeWalletCard(item: unknown): WalletCardRecord | null {
     typeof row.bank === "string" &&
     typeof row.network === "string"
   ) {
-    return {
-      card_id: row.id,
-      bank_name: row.bank,
-      card_name: String(row.network),
-      style_classes: LEGACY_BANK_STYLES[row.bank] ?? DEFAULT_CARD_STYLE,
-    }
+    return withLendingFlag(
+      {
+        card_id: row.id,
+        bank_name: row.bank,
+        card_name: String(row.network),
+        style_classes: LEGACY_BANK_STYLES[row.bank] ?? DEFAULT_CARD_STYLE,
+      },
+      row
+    )
   }
 
   return null
@@ -66,4 +93,18 @@ export function parseWalletCards(raw: unknown): WalletCardRecord[] {
   return raw
     .map(normalizeWalletCard)
     .filter((card): card is WalletCardRecord => card !== null)
+}
+
+export function serializeWalletCards(cards: WalletCardRecord[]): WalletCardRecord[] {
+  return cards.map((card) => ({
+    card_id: card.card_id,
+    bank_name: card.bank_name,
+    card_name: card.card_name,
+    style_classes: card.style_classes,
+    active_for_lending: Boolean(card.active_for_lending),
+  }))
+}
+
+export function countLendingActiveCards(cards: WalletCardRecord[]): number {
+  return cards.filter((card) => card.active_for_lending).length
 }
