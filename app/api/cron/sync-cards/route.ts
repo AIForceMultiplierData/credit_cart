@@ -1,3 +1,4 @@
+// API Route for syncing credit card catalog
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import * as cheerio from "cheerio"
 import { call_ai } from "@/lib/llm-router"
