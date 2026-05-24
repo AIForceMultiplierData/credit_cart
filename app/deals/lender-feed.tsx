@@ -61,10 +61,10 @@ function isPermissionError(message: string): boolean {
 
 function lenderFeedLoadHint(message: string): string {
   if (isSchemaMissingError(message)) {
-    return "Lender feed tables are missing. Run supabase/contracts.sql and supabase/lender_feed_fix.sql in the SQL Editor."
+    return "Contracts table is missing or incomplete. Run supabase/contracts_schema_repair.sql then supabase/lender_feed_fix.sql in the SQL Editor."
   }
   if (isPermissionError(message)) {
-    return "Tables exist but access is blocked. Re-run supabase/lender_feed_fix.sql (section 5 adds get_lender_opportunities RPC), then refresh the page."
+    return "Tables exist but access is blocked. Re-run supabase/lender_feed_fix.sql (full file), then refresh the page."
   }
   return message
 }

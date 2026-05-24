@@ -11,6 +11,7 @@ Execute scripts in **Supabase Dashboard → SQL Editor** in this order. Each fil
 | 5 | `trust_score.sql` | `trust_score`, `get_trust_scores` RPC |
 | 6 | `circle_wallet.sql` | `circle_members`, `get_deal_search_cards` RPC |
 | 7 | `contracts.sql` | `contracts` table + base RLS |
+| 7b | `contracts_schema_repair.sql` | **Run if `column id does not exist` on contracts** |
 | 8 | `transactions.sql` | `transactions` ledger |
 | 9 | `lender_feed_fix.sql` | Lender RLS, view, trust, **`get_lender_opportunities`** |
 | 10 | `lender_opportunities_rpc.sql` | Standalone RPC patch (if step 9 already run) |
