@@ -63,7 +63,12 @@ export default function HomePage() {
 
         {/* Main Content Area */}
         <main className="min-h-[calc(100vh-72px)]">
-          {activeTab === "home" && <HomeView onNavigate={handleNavigate} />}
+          {activeTab === "home" && (
+            <HomeView
+              onNavigate={handleNavigate}
+              onSignIn={() => setLoginOpen(true)}
+            />
+          )}
           {activeTab === "deals" && (
             <>
               <LenderFeed />

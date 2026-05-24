@@ -5,10 +5,12 @@ import { Sparkles, ArrowRight, TrendingUp, Zap } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/useAuth"
 import { supabase } from "@/lib/supabase"
+import { DealSearchBar } from "@/components/deal-search-bar"
 import { cn } from "@/lib/utils"
 
 interface HomeViewProps {
   onNavigate: (tab: "deals" | "wallet" | "activity") => void
+  onSignIn?: () => void
 }
 
 type ProfileStats = {
@@ -78,7 +80,7 @@ function StatCard({
   )
 }
 
-export function HomeView({ onNavigate }: HomeViewProps) {
+export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<ProfileStats>({
@@ -125,12 +127,6 @@ export function HomeView({ onNavigate }: HomeViewProps) {
     void fetchStats()
   }, [authLoading, fetchStats])
 
-  const isNewUser =
-    !loading &&
-    !authLoading &&
-    (stats.total_saved === null || stats.total_saved <= 0) &&
-    (stats.active_deals_count === null || stats.active_deals_count <= 0)
-
   const dealsSubtitle =
     loading || stats.active_deals_count === null || stats.active_deals_count <= 0
       ? "Discover co-purchase deals"
@@ -166,17 +162,10 @@ export function HomeView({ onNavigate }: HomeViewProps) {
         </div>
       </div>
 
-      {isNewUser && (
-        <div className="mb-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-center">
-          <p className="text-sm font-medium text-emerald-300">
-            Ready to start your first pool?
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Browse deals, add a card to your wallet, and ping your circle to save
-            together.
-          </p>
-        </div>
-      )}
+      <DealSearchBar
+        onNeedWallet={() => onNavigate("wallet")}
+        onNeedSignIn={onSignIn}
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-3">
         <StatCard
