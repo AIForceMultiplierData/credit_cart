@@ -91,6 +91,23 @@ function parseCards(raw: unknown): WalletCard[] {
 function getSupabaseErrorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === "object" && "message" in err) {
     const message = String((err as { message: string }).message)
+    const code =
+      "code" in err && (err as { code?: string }).code
+        ? String((err as { code: string }).code)
+        : ""
+
+    if (
+      code === "PGRST202" ||
+      message.includes("get_or_create_my_wallet") ||
+      message.includes("upsert_my_wallet")
+    ) {
+      return "Wallet RPC not installed. Run supabase/wallet_policies.sql in Supabase SQL Editor."
+    }
+
+    if (message.includes("row-level security")) {
+      return `${message} — run supabase/wallet_policies.sql in Supabase SQL Editor.`
+    }
+
     const hint =
       "hint" in err && (err as { hint?: string }).hint
         ? ` (${(err as { hint: string }).hint})`
@@ -98,31 +115,6 @@ function getSupabaseErrorMessage(err: unknown, fallback: string): string {
     return `${message}${hint}`
   }
   return fallback
-}
-
-async function ensureProfile(userId: string): Promise<void> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", userId)
-    .maybeSingle()
-
-  if (error) {
-    throw error
-  }
-
-  if (data) {
-    return
-  }
-
-  const { error: insertError } = await supabase.from("profiles").insert({
-    id: userId,
-    cards: [],
-  })
-
-  if (insertError && insertError.code !== "23505") {
-    throw insertError
-  }
 }
 
 export function WalletView() {
@@ -142,17 +134,11 @@ export function WalletView() {
     setLoading(true)
 
     try {
-      await ensureProfile(user.id)
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("cards")
-        .eq("id", user.id)
-        .maybeSingle()
+      const { data, error } = await supabase.rpc("get_or_create_my_wallet")
 
       if (error) throw error
 
-      setCards(parseCards(data?.cards ?? []))
+      setCards(parseCards(data ?? []))
     } catch (err) {
       const message = getSupabaseErrorMessage(
         err,
@@ -181,24 +167,13 @@ export function WalletView() {
     setSaving(true)
 
     try {
-      await ensureProfile(user.id)
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            cards: nextCards,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" }
-        )
-        .select("cards")
-        .single()
+      const { data, error } = await supabase.rpc("upsert_my_wallet", {
+        p_cards: nextCards,
+      })
 
       if (error) throw error
 
-      setCards(parseCards(data?.cards ?? nextCards))
+      setCards(parseCards(data ?? nextCards))
       toast.success("Wallet updated", {
         description: "Your card is now in the circle arsenal.",
       })
