@@ -77,9 +77,6 @@ export function DealSearchBar({
 
   async function handleSearch() {
     if (!user) {
-      toast.error("Sign in required", {
-        description: "Log in to search deals with your wallet cards.",
-      })
       onNeedSignIn?.()
       return
     }

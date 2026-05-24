@@ -1,11 +1,20 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Sparkles, ArrowRight, TrendingUp, Zap } from "lucide-react"
+import {
+  ArrowRight,
+  CreditCard,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Zap,
+} from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAuth } from "@/hooks/useAuth"
-import { supabase } from "@/lib/supabase"
 import { DealSearchBar } from "@/components/deal-search-bar"
+import { useAuth } from "@/hooks/useAuth"
+import { useProfile } from "@/hooks/useProfile"
+import { useWalletCards } from "@/hooks/useWalletCards"
+import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
 interface HomeViewProps {
@@ -14,17 +23,18 @@ interface HomeViewProps {
 }
 
 type ProfileStats = {
-  total_saved: number | null
-  active_deals_count: number | null
+  total_saved: number
+  active_deals_count: number
 }
 
-function toNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null
+function toCount(value: unknown): number {
+  if (value === null || value === undefined) return 0
   const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0
 }
 
 function formatSaved(amount: number): string {
+  if (amount <= 0) return "₹0"
   if (amount >= 100_000) {
     return `₹${(amount / 100_000).toFixed(1).replace(/\.0$/, "")}L`
   }
@@ -40,40 +50,28 @@ function StatCard({
   loading,
   value,
   label,
-  emptyMessage,
 }: {
   icon: typeof TrendingUp
   iconClassName: string
   loading: boolean
-  value: number | null
+  value: number
   label: string
-  emptyMessage: string
 }) {
-  const hasValue = value !== null && value > 0
+  const displayValue =
+    label === "Saved" ? formatSaved(value) : value.toLocaleString("en-IN")
 
   return (
-    <div className="rounded-2xl border border-slate-800/50 bg-slate-900/60 p-4 text-center backdrop-blur-md">
+    <div className="rounded-2xl border border-slate-800/50 bg-slate-900/60 p-3 text-center backdrop-blur-md">
       <Icon className={cn("mx-auto mb-2 h-5 w-5", iconClassName)} />
       {loading ? (
         <>
-          <Skeleton className="mx-auto mb-2 h-7 w-16 bg-slate-800" />
+          <Skeleton className="mx-auto mb-2 h-7 w-10 bg-slate-800" />
           <Skeleton className="mx-auto h-3 w-12 bg-slate-800/80" />
-        </>
-      ) : hasValue ? (
-        <>
-          <p className="text-xl font-bold text-slate-50">
-            {label === "Saved"
-              ? formatSaved(value)
-              : value.toLocaleString("en-IN")}
-          </p>
-          <p className="text-xs text-slate-500">{label}</p>
         </>
       ) : (
         <>
-          <p className="text-sm font-medium leading-snug text-slate-300">
-            {emptyMessage}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">{label}</p>
+          <p className="text-lg font-bold text-slate-50">{displayValue}</p>
+          <p className="text-xs text-slate-500">{label}</p>
         </>
       )}
     </div>
@@ -82,15 +80,17 @@ function StatCard({
 
 export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
   const { user, loading: authLoading } = useAuth()
+  const { circleCount, loading: profileLoading } = useProfile()
+  const { cards, loading: cardsLoading } = useWalletCards(user?.id)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<ProfileStats>({
-    total_saved: null,
-    active_deals_count: null,
+    total_saved: 0,
+    active_deals_count: 0,
   })
 
   const fetchStats = useCallback(async () => {
     if (!user) {
-      setStats({ total_saved: null, active_deals_count: null })
+      setStats({ total_saved: 0, active_deals_count: 0 })
       setLoading(false)
       return
     }
@@ -109,33 +109,24 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
       }
 
       setStats({
-        total_saved: toNumber(data?.total_saved),
-        active_deals_count: toNumber(data?.active_deals_count),
+        total_saved: toCount(data?.total_saved),
+        active_deals_count: toCount(data?.active_deals_count),
       })
     } catch {
-      setStats({ total_saved: null, active_deals_count: null })
+      setStats({ total_saved: 0, active_deals_count: 0 })
     } finally {
       setLoading(false)
     }
   }, [user])
 
   useEffect(() => {
-    if (authLoading) {
-      return
-    }
-
+    if (authLoading) return
     void fetchStats()
   }, [authLoading, fetchStats])
 
-  const dealsSubtitle =
-    loading || stats.active_deals_count === null || stats.active_deals_count <= 0
-      ? "Discover co-purchase deals"
-      : `${stats.active_deals_count} active deal${stats.active_deals_count === 1 ? "" : "s"}`
-
-  const activitySubtitle =
-    loading || stats.active_deals_count === null || stats.active_deals_count <= 0
-      ? "Your contracts will appear here"
-      : `${stats.active_deals_count} in progress`
+  const statsLoading = loading || authLoading || profileLoading || cardsLoading
+  const cardCount = user ? cards.length : 0
+  const circleMembers = user ? circleCount : 0
 
   return (
     <div className="px-4 pb-32 pt-2">
@@ -167,23 +158,42 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         onNeedSignIn={onSignIn}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <div className="mb-6 grid grid-cols-3 gap-2">
         <StatCard
           icon={TrendingUp}
           iconClassName="text-emerald-400"
-          loading={loading || authLoading}
+          loading={statsLoading}
           value={stats.total_saved}
           label="Saved"
-          emptyMessage="No savings yet"
+        />
+        <StatCard
+          icon={Users}
+          iconClassName="text-blue-400"
+          loading={statsLoading}
+          value={circleMembers}
+          label="Circle"
         />
         <StatCard
           icon={Zap}
           iconClassName="text-purple-400"
-          loading={loading || authLoading}
+          loading={statsLoading}
           value={stats.active_deals_count}
-          label="Active Deals"
-          emptyMessage="No deals yet"
+          label="Deals"
         />
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-slate-800/50 bg-slate-900/60 p-4 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/15">
+            <CreditCard className="h-5 w-5 text-blue-400" />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-50">Wallet cards</p>
+            <p className="text-sm text-slate-400">
+              {statsLoading ? "…" : `${cardCount} card${cardCount === 1 ? "" : "s"} added`}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -203,7 +213,10 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
             </div>
             <div className="text-left">
               <p className="font-semibold text-slate-50">Browse Live Deals</p>
-              <p className="text-sm text-slate-400">{dealsSubtitle}</p>
+              <p className="text-sm text-slate-400">
+                {stats.active_deals_count} active deal
+                {stats.active_deals_count === 1 ? "" : "s"}
+              </p>
             </div>
           </div>
           <ArrowRight className="h-5 w-5 text-emerald-400 transition-transform group-hover:translate-x-1" />
@@ -223,7 +236,9 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
             </div>
             <div className="text-left">
               <p className="font-semibold text-slate-50">Manage Wallet</p>
-              <p className="text-sm text-slate-400">Add cards to unlock discounts</p>
+              <p className="text-sm text-slate-400">
+                {cardCount} card{cardCount === 1 ? "" : "s"} in wallet
+              </p>
             </div>
           </div>
           <ArrowRight className="h-5 w-5 text-blue-400 transition-transform group-hover:translate-x-1" />
@@ -243,7 +258,10 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
             </div>
             <div className="text-left">
               <p className="font-semibold text-slate-50">View Activity</p>
-              <p className="text-sm text-slate-400">{activitySubtitle}</p>
+              <p className="text-sm text-slate-400">
+                {stats.active_deals_count} contract
+                {stats.active_deals_count === 1 ? "" : "s"}
+              </p>
             </div>
           </div>
           <ArrowRight className="h-5 w-5 text-purple-400 transition-transform group-hover:translate-x-1" />

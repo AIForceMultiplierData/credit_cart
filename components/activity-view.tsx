@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { FileText, Loader2, ShieldCheck, Clock, CheckCircle2, Package, ShieldAlert } from "lucide-react"
-import { toast } from "sonner"
 import { DisputeButton } from "@/components/DisputeButton"
 import {
   FulfillmentTrigger,
@@ -127,39 +126,61 @@ export function ActivityView() {
   const { user, loading: authLoading } = useAuth()
   const [contracts, setContracts] = useState<ActivityContract[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadHint, setLoadHint] = useState<string | null>(null)
+  const [liveUpdatesEnabled, setLiveUpdatesEnabled] = useState(false)
 
-  const fetchContracts = useCallback(async () => {
-    if (!user) {
-      setContracts([])
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const { data, error } = await supabase
-        .from("contracts")
-        .select(
-          "id, buyer_id, lender_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
-        )
-        .or(`buyer_id.eq.${user.id},lender_id.eq.${user.id}`)
-        .order("created_at", { ascending: false })
-
-      if (error) {
-        throw error
+  const fetchContracts = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!user) {
+        setContracts([])
+        setLoadHint(null)
+        setLiveUpdatesEnabled(false)
+        setLoading(false)
+        return
       }
 
-      setContracts(((data ?? []) as ContractRow[]).map((row) => mapContract(row, user.id)))
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load contracts."
-      toast.error("Could not load activity", { description: message })
-      setContracts([])
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
+      if (!options?.silent) {
+        setLoading(true)
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("contracts")
+          .select(
+            "id, buyer_id, lender_id, product_name, base_price, card_discount_amount, escrow_status, created_at"
+          )
+          .or(`buyer_id.eq.${user.id},lender_id.eq.${user.id}`)
+          .order("created_at", { ascending: false })
+
+        if (error) {
+          throw error
+        }
+
+        setContracts(
+          ((data ?? []) as ContractRow[]).map((row) => mapContract(row, user.id))
+        )
+        setLoadHint(null)
+        setLiveUpdatesEnabled(true)
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load contracts."
+        if (/does not exist|relation|permission denied|PGRST/i.test(message)) {
+          setLoadHint(
+            "Activity needs Supabase setup. Run supabase/contracts.sql in the SQL Editor."
+          )
+        } else if (!options?.silent) {
+          setLoadHint(message)
+        }
+        setContracts([])
+        setLiveUpdatesEnabled(false)
+      } finally {
+        if (!options?.silent) {
+          setLoading(false)
+        }
+      }
+    },
+    [user]
+  )
 
   useEffect(() => {
     if (authLoading) return
@@ -167,7 +188,7 @@ export function ActivityView() {
   }, [authLoading, fetchContracts])
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !liveUpdatesEnabled) return
 
     const channel = supabase
       .channel(`activity-contracts-${user.id}`)
@@ -175,14 +196,14 @@ export function ActivityView() {
         "postgres_changes",
         { event: "*", schema: "public", table: "contracts" },
         () => {
-          void fetchContracts()
+          void fetchContracts({ silent: true })
         }
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "fulfillment_logs" },
         () => {
-          void fetchContracts()
+          void fetchContracts({ silent: true })
         }
       )
       .subscribe()
@@ -190,7 +211,7 @@ export function ActivityView() {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [user, fetchContracts])
+  }, [user, liveUpdatesEnabled, fetchContracts])
 
   function handleContractStatusChange(contractId: string, nextStatus: string) {
     setContracts((current) =>
@@ -212,8 +233,11 @@ export function ActivityView() {
 
   if (!user) {
     return (
-      <div className="px-4 pb-32 pt-2 text-center">
-        <p className="font-medium text-slate-300">Sign in to view activity</p>
+      <div className="px-4 pb-32 pt-8 text-center">
+        <p className="font-medium text-slate-300">Your activity feed</p>
+        <p className="mt-2 text-sm text-slate-500">
+          Tap the glowing ? above to sign in and track contracts here.
+        </p>
       </div>
     )
   }
@@ -241,6 +265,11 @@ export function ActivityView() {
           <p className="mt-1 text-sm text-slate-500">
             Ping a deal or accept a lending opportunity to get started.
           </p>
+          {loadHint ? (
+            <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-left text-xs leading-relaxed text-amber-200/90">
+              {loadHint}
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-3">

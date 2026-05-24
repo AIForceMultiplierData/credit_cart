@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { signInWithGoogle } from "@/lib/sign-in"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
@@ -19,7 +20,6 @@ type ProfileMenuProps = {
   displayName?: string
   loading?: boolean
   onEditProfile: () => void
-  onSignIn: () => void
 }
 
 function getInitial(user: SupabaseUser | null, displayName?: string): string {
@@ -36,7 +36,6 @@ export function ProfileMenu({
   displayName,
   loading,
   onEditProfile,
-  onSignIn,
 }: ProfileMenuProps) {
   const initial = getInitial(user, displayName)
   const label =
@@ -56,21 +55,48 @@ export function ProfileMenu({
     })
   }
 
+  async function handleSignIn() {
+    const { error } = await signInWithGoogle()
+    if (error) {
+      toast.error("Sign in failed", { description: error })
+    }
+  }
+
   if (!user) {
     return (
-      <button
-        type="button"
-        disabled={loading}
-        onClick={onSignIn}
-        className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-full",
-          "border border-slate-700 bg-slate-900 text-slate-500 text-xs font-bold",
-          "transition-colors hover:border-emerald-400/40 hover:text-emerald-400"
-        )}
-        aria-label="Sign in"
-      >
-        ?
-      </button>
+      <div className="relative flex flex-col items-center">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => void handleSignIn()}
+          className="relative flex h-8 w-8 items-center justify-center rounded-full focus-visible:outline-none"
+          aria-label="Sign in to start saving"
+        >
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping"
+          />
+          <span
+            aria-hidden
+            className={cn(
+              "absolute -inset-0.5 rounded-full border-2 border-emerald-400/80",
+              "animate-[neon-ring_2s_ease-in-out_infinite]"
+            )}
+          />
+          <span
+            className={cn(
+              "relative flex h-8 w-8 items-center justify-center rounded-full",
+              "border border-emerald-400/60 bg-slate-900 text-xs font-bold text-emerald-300",
+              "shadow-[0_0_12px_rgba(52,211,153,0.55)]"
+            )}
+          >
+            ?
+          </span>
+        </button>
+        <p className="pointer-events-none absolute top-full mt-2 w-max max-w-[140px] text-center text-[10px] font-medium leading-tight text-emerald-300">
+          Tap Here To start saving
+        </p>
+      </div>
     )
   }
 

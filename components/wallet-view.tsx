@@ -123,15 +123,18 @@ export function WalletView() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [loadHint, setLoadHint] = useState<string | null>(null)
 
   const fetchCards = useCallback(async () => {
     if (!user) {
       setCards([])
+      setLoadHint(null)
       setLoading(false)
       return
     }
 
     setLoading(true)
+    setLoadHint(null)
 
     try {
       const { data, error } = await supabase.rpc("get_or_create_my_wallet")
@@ -144,7 +147,13 @@ export function WalletView() {
         err,
         "Failed to load wallet cards."
       )
-      toast.error("Could not load wallet", { description: message })
+      if (/does not exist|row-level security|PGRST|get_or_create/i.test(message)) {
+        setLoadHint(
+          "Wallet needs Supabase setup. Run supabase/wallet_policies.sql in the SQL Editor."
+        )
+      } else {
+        setLoadHint(message)
+      }
       setCards([])
     } finally {
       setLoading(false)
@@ -199,6 +208,28 @@ export function WalletView() {
 
   const isBusy = loading || authLoading || saving
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center px-4 pb-32 pt-2">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="px-4 pb-32 pt-8 text-center">
+        <CreditCard className="mx-auto mb-3 h-10 w-10 text-slate-600" />
+        <p className="font-medium text-slate-300">Your wallet</p>
+        <p className="mt-2 text-sm text-slate-500">
+          Tap the glowing ? above to sign in and add cards.
+        </p>
+        <p className="mt-6 text-2xl font-bold text-slate-50">0</p>
+        <p className="text-xs text-slate-500">cards in wallet</p>
+      </div>
+    )
+  }
+
   return (
     <div className="px-4 pb-32 pt-2">
       <div className="mb-6">
@@ -243,6 +274,11 @@ export function WalletView() {
           <p className="mt-1 text-sm text-slate-500">
             Browse the Indian card catalog and add your first card.
           </p>
+          {loadHint ? (
+            <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-left text-xs leading-relaxed text-amber-200/90">
+              {loadHint}
+            </p>
+          ) : null}
           <Button
             type="button"
             className="mt-4 rounded-xl bg-emerald-500 text-slate-900 hover:bg-emerald-400"
@@ -302,12 +338,12 @@ export function WalletView() {
             <p className="text-xs text-slate-500">Cards</p>
           </div>
           <div className="rounded-xl bg-slate-800/50 p-3 text-center">
-            <p className="text-xl font-bold text-blue-400">Live</p>
-            <p className="text-xs text-slate-500">Sync</p>
+            <p className="text-xl font-bold text-blue-400">0</p>
+            <p className="text-xs text-slate-500">Circle</p>
           </div>
           <div className="rounded-xl bg-slate-800/50 p-3 text-center">
-            <p className="text-xl font-bold text-purple-400">100%</p>
-            <p className="text-xs text-slate-500">Trust</p>
+            <p className="text-xl font-bold text-purple-400">0</p>
+            <p className="text-xs text-slate-500">Pooled</p>
           </div>
         </div>
       </div>

@@ -8,11 +8,12 @@ import { LenderFeed } from "@/app/deals/lender-feed"
 import { WalletView } from "@/components/wallet-view"
 import { ActivityView } from "@/components/activity-view"
 import { PingDrawer } from "@/components/ping-drawer"
-import { LoginModal } from "@/components/LoginModal"
 import { ProfileMenu } from "@/components/profile-menu"
 import { ProfileEditModal } from "@/components/profile-edit-modal"
+import { signInWithGoogle } from "@/lib/sign-in"
 import { useAuth } from "@/hooks/useAuth"
 import { useProfile } from "@/hooks/useProfile"
+import { cn } from "@/lib/utils"
 
 type TabType = "home" | "wallet" | "deals" | "activity"
 
@@ -20,14 +21,13 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabType>("home")
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [loginOpen, setLoginOpen] = useState(false)
   const [profileEditOpen, setProfileEditOpen] = useState(false)
   const { user, loading } = useAuth()
   const { profile, refresh: refreshProfile } = useProfile()
 
-  const requiresAuth = activeTab === "wallet" || activeTab === "activity"
-  const showLoginModal =
-    (requiresAuth && !loading && !user) || (loginOpen && !user)
+  const handleSignIn = () => {
+    void signInWithGoogle()
+  }
 
   const handleDealClick = (deal: Deal) => {
     setSelectedDeal(deal)
@@ -44,7 +44,12 @@ export default function HomePage() {
       <div className="max-w-md mx-auto min-h-screen relative border-x border-slate-800 overflow-x-hidden bg-slate-950">
         {/* Status Bar Mockup */}
         <div className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
-          <div className="flex items-center justify-between px-6 py-4">
+          <div
+            className={cn(
+              "flex items-center justify-between px-6 py-4",
+              !user && !loading && "pb-10"
+            )}
+          >
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
                 <span className="text-slate-900 font-bold text-sm">P</span>
@@ -56,7 +61,6 @@ export default function HomePage() {
               displayName={profile?.fullName}
               loading={loading}
               onEditProfile={() => setProfileEditOpen(true)}
-              onSignIn={() => setLoginOpen(true)}
             />
           </div>
         </div>
@@ -64,10 +68,7 @@ export default function HomePage() {
         {/* Main Content Area */}
         <main className="min-h-[calc(100vh-72px)]">
           {activeTab === "home" && (
-            <HomeView
-              onNavigate={handleNavigate}
-              onSignIn={() => setLoginOpen(true)}
-            />
+            <HomeView onNavigate={handleNavigate} onSignIn={handleSignIn} />
           )}
           {activeTab === "deals" && (
             <>
@@ -87,13 +88,6 @@ export default function HomePage() {
           deal={selectedDeal}
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
-        />
-
-        <LoginModal
-          open={showLoginModal}
-          onOpenChange={(open) => {
-            if (!open) setLoginOpen(false)
-          }}
         />
 
         <ProfileEditModal
