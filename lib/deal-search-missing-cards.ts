@@ -1,4 +1,5 @@
 import { CARD_CATALOG } from "@/lib/card-catalog"
+import { cardsReferToSameCard, isCardInWallet } from "@/lib/card-identity"
 import {
   detectPlatform,
   type DealOffer,
@@ -101,9 +102,7 @@ export function buildMissingCardTeasers(input: {
   const limit = input.limit ?? 4
   const platform = detectPlatform(url)
 
-  const walletCardIds = new Set(
-    searchCards.filter((c) => c.source === "wallet").map((c) => c.card_id)
-  )
+  const walletCards = searchCards.filter((c) => c.source === "wallet")
 
   const circleByCardId = new Map<string, string>()
   for (const card of searchCards) {
@@ -118,7 +117,7 @@ export function buildMissingCardTeasers(input: {
   const candidates: MissingCardTeaser[] = []
 
   for (const catalog of CARD_CATALOG) {
-    if (walletCardIds.has(catalog.card_id)) continue
+    if (isCardInWallet(catalog, walletCards)) continue
 
     const pseudo = catalogAsSearchCard(catalog)
     const platformHit = platformScoreForCard(url, catalog.card_id)
@@ -139,11 +138,11 @@ export function buildMissingCardTeasers(input: {
         ? Math.round((estimatedPrice * discountPercent) / 100)
         : 0
 
-    if (
-      estimatedPrice !== null &&
-      discountAmount <= walletBestAmount &&
-      !platformHit
-    ) {
+    if (walletBest && cardsReferToSameCard(catalog, walletBest)) {
+      continue
+    }
+
+    if (estimatedPrice !== null && discountAmount <= walletBestAmount) {
       continue
     }
 

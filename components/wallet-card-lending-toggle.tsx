@@ -34,10 +34,10 @@ export function WalletCardLendingToggle({
             active ? "text-emerald-300" : "text-red-400"
           )}
         >
-          {active ? "Start Earning" : "Lending off"}
+          {active ? "Earning on" : "Earning off"}
         </p>
         <p className="truncate text-[9px] text-slate-500">
-          {active ? "Visible on Lender Desk" : "Not available to lenders"}
+          {active ? "Visible to buyers" : "Not visible to buyers"}
         </p>
       </div>
       <Switch
