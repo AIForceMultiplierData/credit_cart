@@ -2,17 +2,19 @@
 Crop composite card sheets into individual card faces.
 
 Place source images in:
-  app/public/images/cards/sources/ss1.jpg  (Axis 2x4 grid — sheet 1)
-  app/public/images/cards/sources/ss2.jpg  (Axis mixed layout — sheet 2)
+  app/public/images/cards/sources/ss1.jpg  (Axis 2x4 grid)
+  app/public/images/cards/sources/ss2.jpg  (SBI Products catalog — Core Cards grid)
   app/public/images/cards/sources/ss3.jpg  (Axis 2x4 duplicate — optional)
-  app/public/images/cards/sources/ss4.jpg  (SBI catalog grid)
+  app/public/images/cards/sources/ss4.jpg  (SBI catalog — optional duplicate of ss2)
+
+Or pass a path: python scripts/crop-card-sheets.py path/to/sbi-catalog.jpg
 
 Outputs to public/images/cards/ (served at /images/cards/...)
 """
 
 from __future__ import annotations
 
-import os
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -109,17 +111,36 @@ def crop_axis_ss2(img: Image.Image) -> None:
         save_card(img.crop(box).resize(CARD_SIZE, Image.Resampling.LANCZOS), fname)
 
 
-def crop_sbi_ss4(img: Image.Image) -> None:
-    """Left 'Core Cards' block — 2 columns x 4 rows."""
-    region = (0.0, 0.08, 0.44, 0.92)
+def trim_card_label(crop: Image.Image) -> Image.Image:
+    """SBI sheet has card name text below each face — keep top ~82% only."""
+    w, h = crop.size
+    return crop.crop((0, 0, w, int(h * 0.82)))
+
+
+def crop_sbi_catalog(img: Image.Image) -> None:
+    """SBI 'Products' sheet — left Core Cards block, 2 cols × 4 rows."""
+    region = (0.01, 0.10, 0.42, 0.94)
     picks = {
         "sbi_elite.jpeg": (0, 0),
-        "sbi_prime.jpeg": (1, 0),
-        "sbi_simplyclick.jpeg": (0, 2),
-        "sbi_cashback.jpeg": (0, 3),
+        "sbi_prime.jpeg": (0, 1),
+        "sbi_simplyclick.jpeg": (1, 0),
+        "sbi_cashback.jpeg": (1, 1),
+        "sbi_doctors.jpeg": (2, 0),
+        "sbi_elite_business.jpeg": (2, 1),
+        "sbi_shaurya.jpeg": (3, 0),
+        "sbi_unnati.jpeg": (3, 1),
     }
     for fname, (row, col) in picks.items():
-        save_card(crop_cell(img, col, row, 2, 4, region), fname)
+        cell = crop_cell(img, col, row, 2, 4, region)
+        save_card(trim_card_label(cell), fname)
+
+    aliases = {
+        "sbi_simplysave.jpeg": "sbi_cashback.jpeg",
+    }
+    for dest, src in aliases.items():
+        src_path = OUT_PUBLIC / src
+        if src_path.is_file():
+            save_card(Image.open(src_path), dest)
 
 
 def sync_photos_from_app() -> None:
@@ -149,8 +170,8 @@ def main() -> None:
         print(
             "No source sheets found. Save composite images as:\n"
             f"  {SOURCES / 'ss1.jpg'}  (Axis grid)\n"
-            f"  {SOURCES / 'ss2.jpg'}  (Axis grid 2)\n"
-            f"  {SOURCES / 'ss4.jpg'}  (SBI grid)\n"
+            f"  {SOURCES / 'ss2.jpg'}  (SBI Products catalog)\n"
+            f"  {SOURCES / 'ss4.jpg'}  (SBI catalog alt)\n"
             "Then run: python scripts/crop-card-sheets.py"
         )
         return
@@ -158,15 +179,19 @@ def main() -> None:
     if ss1:
         print(f"Cropping Axis from {ss1.name}")
         crop_axis_ss1(Image.open(ss1).convert("RGB"))
-    if ss2:
-        print(f"Cropping Axis extras from {ss2.name}")
-        crop_axis_ss2(Image.open(ss2).convert("RGB"))
+    sbi_sheet = ss2 or ss4
+    if len(sys.argv) > 1:
+        custom = Path(sys.argv[1]).expanduser().resolve()
+        if custom.is_file():
+            sbi_sheet = custom
+            print(f"Using SBI catalog from {custom}")
+
+    if sbi_sheet:
+        print(f"Cropping SBI Core Cards from {sbi_sheet.name}")
+        crop_sbi_catalog(Image.open(sbi_sheet).convert("RGB"))
     if ss3 and not ss1:
         print(f"Cropping Axis from {ss3.name}")
         crop_axis_ss1(Image.open(ss3).convert("RGB"))
-    if ss4:
-        print(f"Cropping SBI from {ss4.name}")
-        crop_sbi_ss4(Image.open(ss4).convert("RGB"))
 
     print(f"Done. Card faces in {OUT_PUBLIC}")
 

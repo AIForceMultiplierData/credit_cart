@@ -111,7 +111,8 @@ update public.card_catalog set card_slug = 'hdfc_bizgrow' where upper(bank_name)
 update public.card_catalog set card_slug = 'hdfc_iocl' where upper(bank_name) = 'HDFC' and (card_name ilike '%indianoil%' or card_name ilike '%iocl%');
 update public.card_catalog set card_slug = 'hdfc_irctc' where upper(bank_name) = 'HDFC' and card_name ilike '%irctc%';
 update public.card_catalog set card_slug = 'hdfc_pixel_play' where upper(bank_name) = 'HDFC' and card_name ilike '%pixel%play%';
-update public.card_catalog set card_slug = 'sbi_elite' where upper(bank_name) = 'SBI' and card_name ilike '%elite%';
+update public.card_catalog set card_slug = 'sbi_elite' where upper(bank_name) = 'SBI' and card_name ilike '%elite%' and card_name not ilike '%business%';
+update public.card_catalog set card_slug = 'sbi_prime' where upper(bank_name) = 'SBI' and card_name ilike '%prime%' and card_name not ilike '%vistara%';
 
 -- Seed HDFC cards that exist as photos but may be missing from card_catalog
 insert into public.card_catalog (card_id, bank_name, card_name, style_classes, card_slug, is_active) values
@@ -139,9 +140,10 @@ update public.card_catalog set card_image_url = '/images/cards/hdfc_irctc.webp' 
 update public.card_catalog set card_image_url = '/images/cards/hdfc_pixel_play.webp' where card_slug = 'hdfc_pixel_play';
 update public.card_catalog set card_image_url = '/cards/hdfc_diners.svg' where card_slug = 'hdfc_diners';
 update public.card_catalog set card_image_url = '/cards/hdfc_tata_neu.svg' where card_slug = 'hdfc_tata_neu';
-update public.card_catalog set card_image_url = '/images/cards/sbi_cashback.jpeg' where card_slug = 'sbi_cashback';
-update public.card_catalog set card_image_url = '/images/cards/sbi_simplyclick.jpeg' where card_slug = 'sbi_simplyclick';
 update public.card_catalog set card_image_url = '/images/cards/sbi_elite.jpeg' where card_slug = 'sbi_elite';
+update public.card_catalog set card_image_url = '/images/cards/sbi_prime.jpeg' where card_slug = 'sbi_prime';
+update public.card_catalog set card_image_url = '/images/cards/sbi_simplyclick.jpeg' where card_slug = 'sbi_simplyclick';
+update public.card_catalog set card_image_url = '/images/cards/sbi_cashback.jpeg' where card_slug = 'sbi_cashback';
 update public.card_catalog set card_image_url = '/images/cards/icici_amazon.jpeg' where card_slug = 'icici_amazon';
 update public.card_catalog set card_image_url = '/images/cards/icici_sapphiro.jpeg' where card_slug = 'icici_sapphiro';
 update public.card_catalog set card_image_url = '/images/cards/axis_flipkart.jpeg' where card_slug = 'axis_flipkart';

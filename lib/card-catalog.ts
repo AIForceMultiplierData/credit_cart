@@ -93,6 +93,13 @@ const RAW_CATALOG: Omit<CatalogCard, "bank_logo_url" | "card_image_url">[] = [
     apply_url: "https://www.hdfc.bank.in/credit-cards",
   },
   {
+    card_id: "sbi_prime",
+    bank_name: "SBI",
+    card_name: "PRIME",
+    style_classes: "bg-gradient-to-br from-slate-900 to-emerald-950 text-white",
+    apply_url: "https://www.sbicard.com/en/personal/credit-cards",
+  },
+  {
     card_id: "sbi_cashback",
     bank_name: "SBI",
     card_name: "Cashback Card",

@@ -26,6 +26,8 @@ insert into public.card_catalog (card_id, bank_name, card_name, style_classes) v
   ('hdfc_iocl', 'HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100'),
   ('hdfc_irctc', 'HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100'),
   ('hdfc_pixel_play', 'HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100'),
+  ('sbi_elite', 'SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white'),
+  ('sbi_prime', 'SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white'),
   ('sbi_cashback', 'SBI', 'Cashback Card', 'bg-gradient-to-br from-cyan-500 to-blue-700 text-white'),
   ('sbi_simplyclick', 'SBI', 'SimplyCLICK', 'bg-gradient-to-br from-teal-400 to-emerald-700 text-white'),
   ('icici_amazon', 'ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100'),
