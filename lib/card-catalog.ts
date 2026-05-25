@@ -1,5 +1,5 @@
 import { BANK_REGISTRY } from "@/lib/bank-registry"
-import { getCardArtUrl } from "@/lib/card-art-registry"
+import { resolveCardImageUrl } from "@/lib/card-photo-registry"
 
 export type CatalogCard = {
   card_id: string
@@ -141,7 +141,7 @@ const RAW_CATALOG: Omit<CatalogCard, "bank_logo_url" | "card_image_url">[] = [
 export const CARD_CATALOG: CatalogCard[] = RAW_CATALOG.map((card) => ({
   ...card,
   bank_logo_url: logo(card.bank_name),
-  card_image_url: getCardArtUrl(card.card_id) ?? undefined,
+  card_image_url: resolveCardImageUrl(card.card_id) ?? undefined,
 }))
 
 export function getCatalogCard(cardId: string): CatalogCard | undefined {

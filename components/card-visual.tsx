@@ -1,7 +1,7 @@
 "use client"
 
 import { BankLogo } from "@/components/bank-logo"
-import { getCardArtUrl } from "@/lib/card-art-registry"
+import { resolveCardImageUrl } from "@/lib/card-photo-registry"
 import { cn } from "@/lib/utils"
 
 type CardVisualProps = {
@@ -52,7 +52,7 @@ export function CardVisual({
   subtitle,
   size = "md",
 }: CardVisualProps) {
-  const artUrl = getCardArtUrl(cardId, cardImageUrl)
+  const artUrl = resolveCardImageUrl(cardId, cardImageUrl)
   const compact = size === "sm"
 
   return (

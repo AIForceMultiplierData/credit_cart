@@ -1,6 +1,6 @@
 import type { WalletCardRecord } from "@/components/add-card-modal"
 import { getCatalogCard, CARD_CATALOG } from "@/lib/card-catalog"
-import { getCardArtUrl } from "@/lib/card-art-registry"
+import { resolveCardImageUrl } from "@/lib/card-photo-registry"
 import { findCatalogMatch } from "@/lib/card-identity"
 import { resolveBankProfile } from "@/lib/bank-registry"
 
@@ -25,7 +25,7 @@ export function enrichWalletCard(card: WalletCardRecord): WalletCardRecord {
     card_image_url:
       card.card_image_url ??
       catalog?.card_image_url ??
-      (slug ? getCardArtUrl(slug) : null),
+      (slug ? resolveCardImageUrl(slug) : null),
     style_classes: catalog?.style_classes ?? card.style_classes,
   }
 }
@@ -42,7 +42,7 @@ export function catalogRowsFromStaticCatalog() {
       bank_id: bank.bank_id,
       bank_name: c.bank_name,
       bank_logo_url: c.bank_logo_url ?? bank.logo_url,
-      card_image_url: c.card_image_url ?? getCardArtUrl(c.card_id),
+      card_image_url: c.card_image_url ?? resolveCardImageUrl(c.card_id),
       card_name: c.card_name,
       style_classes: c.style_classes,
       network: null,

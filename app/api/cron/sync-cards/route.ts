@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import * as cheerio from "cheerio"
 import { BANK_REGISTRY, resolveBankProfile } from "@/lib/bank-registry"
-import { getCardArtUrl } from "@/lib/card-art-registry"
+import { resolveCardImageUrl } from "@/lib/card-photo-registry"
 import { call_ai } from "@/lib/llm-router"
 
 const CARD_EXTRACTION_PROMPT =
@@ -332,7 +332,7 @@ async function upsertCardsToCatalog(
       bank_id: card.bank_id,
       bank_name: card.bank_name,
       bank_logo_url: card.bank_logo_url,
-      card_image_url: getCardArtUrl(cardId),
+      card_image_url: resolveCardImageUrl(cardId),
       card_name: card.card_name,
       style_classes: card.style_classes,
       network: card.network,

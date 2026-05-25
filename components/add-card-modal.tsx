@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { BankLogo } from "@/components/bank-logo"
 import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
-import { getCardArtUrl } from "@/lib/card-art-registry"
+import { resolveCardImageUrl } from "@/lib/card-photo-registry"
 import { catalogRowsFromStaticCatalog } from "@/lib/enrich-wallet-card"
 import { BANK_REGISTRY, resolveBankProfile } from "@/lib/bank-registry"
 import { supabase } from "@/lib/supabase"
@@ -69,7 +69,7 @@ function enrichCatalogRow(row: CardCatalogSelect): CardCatalogRow {
   const bank = resolveBankProfile(row.bank_name, row.bank_id)
 
   const cardImage =
-    row.card_image_url ?? getCardArtUrl(row.card_id) ?? null
+    row.card_image_url ?? resolveCardImageUrl(row.card_id) ?? null
 
   return {
     card_id: row.card_id,
