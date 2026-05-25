@@ -54,3 +54,5 @@ select * from analytics.v_contract_funnel;
 ## If step 1 partially ran before
 
 `card_banks` may already exist. Re-running `card_catalog_master.sql` is safe (idempotent).
+
+If you see `42P16: cannot change name of view column "card_name" to "card_image_url"`, the script now drops and recreates the view — run the full file again from the top.

@@ -177,7 +177,10 @@ set apply_url = 'https://www.axis.bank.in/cards/credit-card/axis-bank-magnus-cre
 where upper(bank_name) = 'AXIS' and card_name ilike '%magnus%';
 
 -- ── Step 3: Enriched view (card_id = slug for app compatibility) ───────────────
-create or replace view public.card_catalog_master as
+-- DROP required when adding/reordering columns (CREATE OR REPLACE cannot rename by position).
+drop view if exists public.card_catalog_master;
+
+create view public.card_catalog_master as
 select
   coalesce(c.card_slug, c.card_id::text) as card_id,
   c.card_id as card_uuid,
