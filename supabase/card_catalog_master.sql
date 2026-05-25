@@ -107,24 +107,47 @@ update public.card_catalog set card_slug = 'axis_airtel' where upper(bank_name) 
 update public.card_catalog set card_slug = 'hdfc_swiggy' where upper(bank_name) = 'HDFC' and card_name ilike '%swiggy%';
 update public.card_catalog set card_slug = 'hdfc_tata_neu' where upper(bank_name) = 'HDFC' and card_name ilike '%neu%';
 update public.card_catalog set card_slug = 'hdfc_freedom' where upper(bank_name) = 'HDFC' and card_name ilike '%freedom%';
+update public.card_catalog set card_slug = 'hdfc_bizgrow' where upper(bank_name) = 'HDFC' and card_name ilike '%bizgrow%';
+update public.card_catalog set card_slug = 'hdfc_iocl' where upper(bank_name) = 'HDFC' and (card_name ilike '%indianoil%' or card_name ilike '%iocl%');
+update public.card_catalog set card_slug = 'hdfc_irctc' where upper(bank_name) = 'HDFC' and card_name ilike '%irctc%';
+update public.card_catalog set card_slug = 'hdfc_pixel_play' where upper(bank_name) = 'HDFC' and card_name ilike '%pixel%play%';
 update public.card_catalog set card_slug = 'sbi_elite' where upper(bank_name) = 'SBI' and card_name ilike '%elite%';
 
--- Card face art (public/cards/*.svg)
-update public.card_catalog set card_image_url = '/cards/hdfc_millennia.svg' where card_slug = 'hdfc_millennia';
-update public.card_catalog set card_image_url = '/cards/hdfc_regalia.svg' where card_slug = 'hdfc_regalia';
+-- Seed HDFC cards that exist as photos but may be missing from card_catalog
+insert into public.card_catalog (card_id, bank_name, card_name, style_classes, card_slug, is_active) values
+  ('hdfc_bizgrow', 'HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100', 'hdfc_bizgrow', true),
+  ('hdfc_iocl', 'HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100', 'hdfc_iocl', true),
+  ('hdfc_irctc', 'HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100', 'hdfc_irctc', true),
+  ('hdfc_pixel_play', 'HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100', 'hdfc_pixel_play', true),
+  ('hdfc_swiggy', 'HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy', true),
+  ('hdfc_freedom', 'HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom', true)
+on conflict (card_id) do update set
+  bank_name = excluded.bank_name,
+  card_name = excluded.card_name,
+  style_classes = excluded.style_classes,
+  card_slug = excluded.card_slug,
+  is_active = true;
+
+-- Card face photos (public/images/cards — app uses resolveCardImageUrl; SVG fallback if missing)
+update public.card_catalog set card_image_url = '/images/cards/hdfc_millenia.jpeg' where card_slug = 'hdfc_millennia';
+update public.card_catalog set card_image_url = '/images/cards/hdfc_regelia.jpeg' where card_slug = 'hdfc_regalia';
+update public.card_catalog set card_image_url = '/images/cards/hdfc_swiggy.jpeg' where card_slug = 'hdfc_swiggy';
+update public.card_catalog set card_image_url = '/images/cards/hdfc_freedom.jpeg' where card_slug = 'hdfc_freedom';
+update public.card_catalog set card_image_url = '/images/cards/hdfc_bizgrow.jpeg' where card_slug = 'hdfc_bizgrow';
+update public.card_catalog set card_image_url = '/images/cards/hdfc_iocl.webp' where card_slug = 'hdfc_iocl';
+update public.card_catalog set card_image_url = '/images/cards/hdfc_irctc.webp' where card_slug = 'hdfc_irctc';
+update public.card_catalog set card_image_url = '/images/cards/hdfc_pixel_play.webp' where card_slug = 'hdfc_pixel_play';
 update public.card_catalog set card_image_url = '/cards/hdfc_diners.svg' where card_slug = 'hdfc_diners';
-update public.card_catalog set card_image_url = '/cards/hdfc_swiggy.svg' where card_slug = 'hdfc_swiggy';
 update public.card_catalog set card_image_url = '/cards/hdfc_tata_neu.svg' where card_slug = 'hdfc_tata_neu';
-update public.card_catalog set card_image_url = '/cards/hdfc_freedom.svg' where card_slug = 'hdfc_freedom';
-update public.card_catalog set card_image_url = '/cards/sbi_cashback.svg' where card_slug = 'sbi_cashback';
-update public.card_catalog set card_image_url = '/cards/sbi_simplyclick.svg' where card_slug = 'sbi_simplyclick';
-update public.card_catalog set card_image_url = '/cards/sbi_elite.svg' where card_slug = 'sbi_elite';
-update public.card_catalog set card_image_url = '/cards/icici_amazon.svg' where card_slug = 'icici_amazon';
-update public.card_catalog set card_image_url = '/cards/icici_sapphiro.svg' where card_slug = 'icici_sapphiro';
-update public.card_catalog set card_image_url = '/cards/axis_flipkart.svg' where card_slug = 'axis_flipkart';
-update public.card_catalog set card_image_url = '/cards/axis_magnus.svg' where card_slug = 'axis_magnus';
-update public.card_catalog set card_image_url = '/cards/axis_vistara.svg' where card_slug = 'axis_vistara';
-update public.card_catalog set card_image_url = '/cards/axis_airtel.svg' where card_slug = 'axis_airtel';
+update public.card_catalog set card_image_url = '/images/cards/sbi_cashback.jpeg' where card_slug = 'sbi_cashback';
+update public.card_catalog set card_image_url = '/images/cards/sbi_simplyclick.jpeg' where card_slug = 'sbi_simplyclick';
+update public.card_catalog set card_image_url = '/images/cards/sbi_elite.jpeg' where card_slug = 'sbi_elite';
+update public.card_catalog set card_image_url = '/images/cards/icici_amazon.jpeg' where card_slug = 'icici_amazon';
+update public.card_catalog set card_image_url = '/images/cards/icici_sapphiro.jpeg' where card_slug = 'icici_sapphiro';
+update public.card_catalog set card_image_url = '/images/cards/axis_flipkart.jpeg' where card_slug = 'axis_flipkart';
+update public.card_catalog set card_image_url = '/images/cards/axis_magnus.jpeg' where card_slug = 'axis_magnus';
+update public.card_catalog set card_image_url = '/images/cards/axis_vistara.jpeg' where card_slug = 'axis_vistara';
+update public.card_catalog set card_image_url = '/images/cards/axis_airtel.jpeg' where card_slug = 'axis_airtel';
 
 create unique index if not exists card_catalog_card_slug_key
   on public.card_catalog (card_slug)

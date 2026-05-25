@@ -122,18 +122,23 @@ def crop_sbi_ss4(img: Image.Image) -> None:
         save_card(crop_cell(img, col, row, 2, 4, region), fname)
 
 
-def sync_hdfc_from_app() -> None:
-    """Copy existing HDFC crops into public/ for Next.js static serving."""
-    for src in OUT_APP.glob("hdfc_*"):
-        if src.is_file():
-            dest = OUT_PUBLIC / src.name
-            if not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime:
-                dest.write_bytes(src.read_bytes())
+def sync_photos_from_app() -> None:
+    """Copy all card photos from app/public → public/ (Next.js only serves public/)."""
+    OUT_PUBLIC.mkdir(parents=True, exist_ok=True)
+    for src in OUT_APP.iterdir():
+        if not src.is_file():
+            continue
+        if src.suffix.lower() not in (".jpg", ".jpeg", ".png", ".webp"):
+            continue
+        dest = OUT_PUBLIC / src.name
+        if not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime:
+            dest.write_bytes(src.read_bytes())
+            print(f"Synced {src.name} → public/images/cards/")
 
 
 def main() -> None:
     SOURCES.mkdir(parents=True, exist_ok=True)
-    sync_hdfc_from_app()
+    sync_photos_from_app()
 
     ss1 = find_source("ss1")
     ss2 = find_source("ss2")
