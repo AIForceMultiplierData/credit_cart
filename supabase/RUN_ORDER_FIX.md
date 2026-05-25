@@ -16,10 +16,30 @@ In SQL Editor, run the **entire** file:
 
 This will:
 
-- Create `card_banks`
-- Add `card_slug` (app id like `hdfc_millennia`)
-- Backfill banks/logos/apply URLs using **bank_name + card_name** (not uuid)
+- Create `card_banks` (`bank_id` = `hdfc`, `icici`, `sbi` — not card slugs)
+- Add `card_slug` (app card id like `hdfc_millennia`)
 - Create `card_catalog_master` view
+
+### 1b. Live card catalog (230 products)
+
+After step 1 succeeds, run:
+
+`supabase/card_catalog_live_seed.sql`
+
+Regenerate after editing master list:
+
+`node scripts/generate-card-catalog-master.mjs`
+
+Column mapping:
+
+| Your paste column | DB / app field |
+|-------------------|----------------|
+| 1st value (`hdfc_millennia`) | `card_slug` / app `card_id` |
+| 2nd value (`HDFC Millennia`) | `card_name` |
+| 3rd (`/cards/...svg`) | `card_image_url` |
+| 4th (`#hex`) | `brand_color` (bank/card styling) |
+| 5th (`bg-gradient...`) | `style_classes` |
+| — | `bank_id` = `hdfc`, `icici`, `axis`, … (derived from slug prefix) |
 
 ### 2. Indian airports (flight FROM/TO)
 

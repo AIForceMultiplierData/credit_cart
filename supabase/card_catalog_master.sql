@@ -117,92 +117,9 @@ update public.card_catalog set card_slug = 'hdfc_pixel_play' where upper(bank_na
 update public.card_catalog set card_slug = 'sbi_elite' where upper(bank_name) = 'SBI' and card_name ilike '%elite%' and card_name not ilike '%business%';
 update public.card_catalog set card_slug = 'sbi_prime' where upper(bank_name) = 'SBI' and card_name ilike '%prime%' and card_name not ilike '%vistara%';
 
--- Seed cards missing from catalog (never put slugs in card_id when PK is uuid)
-do $$
-declare
-  card_id_type text;
-begin
-  select c.data_type
-  into card_id_type
-  from information_schema.columns c
-  where c.table_schema = 'public'
-    and c.table_name = 'card_catalog'
-    and c.column_name = 'card_id';
-
-  if card_id_type = 'uuid' then
-    insert into public.card_catalog (bank_name, card_name, style_classes, card_slug, is_active)
-    select v.bank_name, v.card_name, v.style_classes, v.card_slug, true
-    from (
-      values
-        ('HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100', 'hdfc_bizgrow'),
-        ('HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100', 'hdfc_iocl'),
-        ('HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100', 'hdfc_irctc'),
-        ('HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100', 'hdfc_pixel_play'),
-        ('HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy'),
-        ('HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom'),
-        ('SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white', 'sbi_elite'),
-        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime'),
-        ('ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100', 'icici_amazon'),
-        ('ICICI', 'Sapphiro', 'bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200', 'icici_sapphiro'),
-        ('ICICI', 'Coral', 'bg-gradient-to-br from-orange-700 to-red-950 text-orange-100', 'icici_coral'),
-        ('ICICI', 'Emeralde', 'bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100', 'icici_emeralde'),
-        ('ICICI', 'Rubyx', 'bg-gradient-to-br from-red-800 to-rose-950 text-red-100', 'icici_rubyx')
-    ) as v(bank_name, card_name, style_classes, card_slug)
-    where not exists (
-      select 1 from public.card_catalog c where c.card_slug = v.card_slug
-    );
-  else
-    insert into public.card_catalog (card_id, bank_name, card_name, style_classes, card_slug, is_active)
-    select v.card_slug, v.bank_name, v.card_name, v.style_classes, v.card_slug, true
-    from (
-      values
-        ('HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100', 'hdfc_bizgrow'),
-        ('HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100', 'hdfc_iocl'),
-        ('HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100', 'hdfc_irctc'),
-        ('HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100', 'hdfc_pixel_play'),
-        ('HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy'),
-        ('HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom'),
-        ('SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white', 'sbi_elite'),
-        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime'),
-        ('ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100', 'icici_amazon'),
-        ('ICICI', 'Sapphiro', 'bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200', 'icici_sapphiro'),
-        ('ICICI', 'Coral', 'bg-gradient-to-br from-orange-700 to-red-950 text-orange-100', 'icici_coral'),
-        ('ICICI', 'Emeralde', 'bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100', 'icici_emeralde'),
-        ('ICICI', 'Rubyx', 'bg-gradient-to-br from-red-800 to-rose-950 text-red-100', 'icici_rubyx')
-    ) as v(bank_name, card_name, style_classes, card_slug)
-    on conflict (card_id) do update set
-      bank_name = excluded.bank_name,
-      card_name = excluded.card_name,
-      style_classes = excluded.style_classes,
-      card_slug = excluded.card_slug,
-      is_active = true;
-  end if;
-end $$;
-
--- Card face photos (public/images/cards — app uses resolveCardImageUrl; SVG fallback if missing)
-update public.card_catalog set card_image_url = '/images/cards/hdfc_millenia.jpeg' where card_slug = 'hdfc_millennia';
-update public.card_catalog set card_image_url = '/images/cards/hdfc_regelia.jpeg' where card_slug = 'hdfc_regalia';
-update public.card_catalog set card_image_url = '/images/cards/hdfc_swiggy.jpeg' where card_slug = 'hdfc_swiggy';
-update public.card_catalog set card_image_url = '/images/cards/hdfc_freedom.jpeg' where card_slug = 'hdfc_freedom';
-update public.card_catalog set card_image_url = '/images/cards/hdfc_bizgrow.jpeg' where card_slug = 'hdfc_bizgrow';
-update public.card_catalog set card_image_url = '/images/cards/hdfc_iocl.webp' where card_slug = 'hdfc_iocl';
-update public.card_catalog set card_image_url = '/images/cards/hdfc_irctc.webp' where card_slug = 'hdfc_irctc';
-update public.card_catalog set card_image_url = '/images/cards/hdfc_pixel_play.webp' where card_slug = 'hdfc_pixel_play';
-update public.card_catalog set card_image_url = '/cards/hdfc_diners.svg' where card_slug = 'hdfc_diners';
-update public.card_catalog set card_image_url = '/cards/hdfc_tata_neu.svg' where card_slug = 'hdfc_tata_neu';
-update public.card_catalog set card_image_url = '/images/cards/sbi_elite.jpeg' where card_slug = 'sbi_elite';
-update public.card_catalog set card_image_url = '/images/cards/sbi_prime.jpeg' where card_slug = 'sbi_prime';
-update public.card_catalog set card_image_url = '/images/cards/sbi_simplyclick.jpeg' where card_slug = 'sbi_simplyclick';
-update public.card_catalog set card_image_url = '/images/cards/sbi_cashback.jpeg' where card_slug = 'sbi_cashback';
-update public.card_catalog set card_image_url = '/images/cards/icici_amazon.jpeg' where card_slug = 'icici_amazon';
-update public.card_catalog set card_image_url = '/images/cards/icici_sapphiro.jpeg' where card_slug = 'icici_sapphiro';
-update public.card_catalog set card_image_url = '/images/cards/icici_coral.jpeg' where card_slug = 'icici_coral';
-update public.card_catalog set card_image_url = '/images/cards/icici_emeralde.jpeg' where card_slug = 'icici_emeralde';
-update public.card_catalog set card_image_url = '/images/cards/icici_rubyx.jpeg' where card_slug = 'icici_rubyx';
-update public.card_catalog set card_image_url = '/images/cards/axis_flipkart.jpeg' where card_slug = 'axis_flipkart';
-update public.card_catalog set card_image_url = '/images/cards/axis_magnus.jpeg' where card_slug = 'axis_magnus';
-update public.card_catalog set card_image_url = '/images/cards/axis_vistara.jpeg' where card_slug = 'axis_vistara';
-update public.card_catalog set card_image_url = '/images/cards/axis_airtel.jpeg' where card_slug = 'axis_airtel';
+-- Step 2b: Live product master (240 cards) — run entire file next:
+--   supabase/card_catalog_live_seed.sql
+-- Regenerate from scripts/generate-card-catalog-master.mjs after edits.
 
 create unique index if not exists card_catalog_card_slug_key
   on public.card_catalog (card_slug)
