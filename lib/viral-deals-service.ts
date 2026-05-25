@@ -1,5 +1,8 @@
 import { SERPER_API_KEYS } from "@/lib/llm-router"
-import { buildMissingCardTeasers } from "@/lib/deal-search-missing-cards"
+import {
+  buildMissingCardTeasers,
+  estimateWalletBestDiscount,
+} from "@/lib/deal-search-missing-cards"
 import type { SearchCardInput } from "@/lib/deal-search"
 import {
   fetchSerperPlatformCardOffers,
@@ -71,12 +74,20 @@ function pickBestDealForProduct(
     } satisfies SerperDealContext)
 
   const url = productUrlForPlatform(product.platform, product.url)
+  const walletCards = searchCards.filter((c) => c.source === "wallet")
+  const walletBestAmount = estimateWalletBestDiscount(
+    url,
+    product.price,
+    walletCards,
+    serper
+  )
   const teasers = buildMissingCardTeasers({
     url,
     estimatedPrice: product.price,
     searchCards,
     offers: [],
     serper,
+    walletBestAmount,
     limit: 1,
   })
 

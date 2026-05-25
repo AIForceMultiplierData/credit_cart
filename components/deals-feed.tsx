@@ -264,6 +264,9 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
               <p className="mt-2 text-xs leading-relaxed text-violet-300/90">
                 {deal.splitHint}
               </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Not in your wallet — apply to keep 100% cashback on this purchase.
+              </p>
 
               <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-800/50 pt-3">
                 <div className="flex items-center gap-1.5 text-sm text-slate-400">

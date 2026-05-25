@@ -460,11 +460,11 @@ export function FlightSearchForm({ value, onChange }: FlightSearchFormProps) {
 
       <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
         <Label className="text-xs font-semibold text-amber-200/90">
-          Total fare from booking page (required)
+          Total fare (optional)
         </Label>
         <p className="mb-2 mt-1 text-[11px] leading-relaxed text-slate-400">
-          Copy the all-in price from MakeMyTrip / Cleartrip / airline checkout —
-          we need this before ranking your best card.
+          Pick a flight after search, or paste all-in fare from MakeMyTrip /
+          Cleartrip checkout.
         </p>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">

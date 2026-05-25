@@ -13,6 +13,7 @@ import {
   type DealSearchCategory,
   type DealSearchResult,
   type MarketOffer,
+  type TravelListing,
   type SearchCardInput,
   type WalletCardInput,
 } from "@/lib/deal-search"
@@ -24,7 +25,21 @@ import {
   buildFlightSerperQuery,
   parseFlightSearchBody,
   validateFlightSearch,
+  type FlightSearchParams,
 } from "@/lib/flight-search"
+import {
+  buildHotelProductTitle,
+  buildHotelReferenceUrl,
+  buildHotelSerperQuery,
+  parseHotelSearchBody,
+  validateHotelSearch,
+  type HotelSearchParams,
+} from "@/lib/hotel-search"
+import {
+  generateFlightListings,
+  generateHotelListings,
+  resolveTravelPrice,
+} from "@/lib/travel-listings"
 import {
   fetchSerperDealContext,
   type SerperDealContext,
@@ -36,12 +51,90 @@ type SearchRequestBody = {
   searchCards?: SearchCardInput[]
   walletCards?: WalletCardInput[]
   flightSearch?: unknown
+  hotelSearch?: unknown
 }
 
 export type DealSearchOverrides = {
   productTitle?: string
   estimatedPrice?: number | null
   serperQuery?: string
+  travelListings?: TravelListing[]
+  selectedTravelListingId?: string | null
+}
+
+function buildTravelOverrides(
+  category: DealSearchCategory,
+  flight: FlightSearchParams | null,
+  hotel: HotelSearchParams | null
+): DealSearchOverrides | { error: string } {
+  if (category === "flight" && flight) {
+    const listings = generateFlightListings(flight)
+    const price = resolveTravelPrice(
+      listings,
+      flight.estimatedFare,
+      flight.selectedListingId
+    )
+    if (price === null) {
+      return { error: "Pick a flight or enter total fare (₹) for card ranking." }
+    }
+    return {
+      productTitle: buildFlightProductTitle(flight),
+      estimatedPrice: price,
+      serperQuery: buildFlightSerperQuery(flight),
+      travelListings: listings,
+      selectedTravelListingId:
+        flight.selectedListingId ?? listings[0]?.id ?? null,
+    }
+  }
+
+  if (category === "hotels" && hotel) {
+    const listings = generateHotelListings(hotel)
+    const price = resolveTravelPrice(
+      listings,
+      hotel.estimatedTotal,
+      hotel.selectedListingId
+    )
+    if (price === null) {
+      return {
+        error: "Pick a hotel or enter total stay price (₹) for card ranking.",
+      }
+    }
+    return {
+      productTitle: buildHotelProductTitle(hotel),
+      estimatedPrice: price,
+      serperQuery: buildHotelSerperQuery(hotel),
+      travelListings: listings,
+      selectedTravelListingId:
+        hotel.selectedListingId ?? listings[0]?.id ?? null,
+    }
+  }
+
+  return { error: "Invalid travel search." }
+}
+
+function applyTravelToResult(
+  result: DealSearchResult,
+  overrides?: DealSearchOverrides
+): DealSearchResult {
+  if (!overrides?.travelListings?.length) {
+    return {
+      ...result,
+      travel_listings: result.travel_listings ?? [],
+      selected_travel_listing_id: result.selected_travel_listing_id ?? null,
+    }
+  }
+
+  const sources = result.data_sources.includes("travel_estimates")
+    ? result.data_sources
+    : [...result.data_sources, "travel_estimates"]
+
+  return {
+    ...result,
+    travel_listings: overrides.travelListings,
+    selected_travel_listing_id: overrides.selectedTravelListingId ?? null,
+    estimated_price: overrides.estimatedPrice ?? result.estimated_price,
+    data_sources: sources,
+  }
 }
 
 type UrlHints = {
@@ -302,7 +395,8 @@ function buildAiResult(
   searchCards: SearchCardInput[],
   aiPayload: AiDealPayload,
   hints: UrlHints,
-  serper: SerperDealContext
+  serper: SerperDealContext,
+  overrides?: DealSearchOverrides
 ): DealSearchResult {
   const estimatedPrice =
     aiPayload.estimated_price ?? serper.price ?? hints.price ?? null
@@ -342,27 +436,25 @@ function buildAiResult(
     used_ai: true,
     used_serper: serper.used_serper,
     data_sources: buildDataSources(hints, serper, true),
+    travel_listings: [],
+    selected_travel_listing_id: null,
     market_offers: buildMarketOffersFromSerper(serper),
     ...counts,
   }
 
   return finalizeSearchResult(
     attachSerperMetadata(base, hints, serper, true, searchCards, url),
-    url
+    url,
+    overrides
   )
 }
 
 function finalizeSearchResult(
   result: DealSearchResult,
-  url: string
+  url: string,
+  overrides?: DealSearchOverrides
 ): DealSearchResult {
-  return enrichDealSearchResult(result, url)
-}
-
-export type DealSearchOverrides = {
-  productTitle?: string
-  estimatedPrice?: number | null
-  serperQuery?: string
+  return applyTravelToResult(enrichDealSearchResult(result, url), overrides)
 }
 
 export async function searchDealsForWallet(
@@ -415,7 +507,8 @@ export async function searchDealsForWallet(
       searchCards,
       aiPayload,
       enrichedHints,
-      serper
+      serper,
+      overrides
     )
   } catch {
     const fallback = buildFallbackResult(
@@ -449,7 +542,8 @@ export async function searchDealsForWallet(
         searchCards,
         url
       ),
-      url
+      url,
+      overrides
     )
   }
 }
@@ -473,27 +567,49 @@ export function parseSearchRequestBody(body: SearchRequestBody): {
     if (!body.flightSearch) {
       return {
         error:
-          "Complete flight route, dates, and total fare (₹) — required for card ranking.",
+          "Complete flight route, dates, and fare — required for card ranking.",
       }
     }
     const flight = parseFlightSearchBody(body.flightSearch)
     if (!flight) {
       return { error: "Invalid flight search details." }
     }
-    const valid = validateFlightSearch(flight)
+    const valid = validateFlightSearch(flight, { requirePrice: false })
     if (!valid.ok) {
       return { error: valid.message }
     }
     url = buildFlightReferenceUrl(flight)
-    overrides = {
-      productTitle: buildFlightProductTitle(flight),
-      estimatedPrice: flight.estimatedFare,
-      serperQuery: buildFlightSerperQuery(flight),
+    const travel = buildTravelOverrides("flight", flight, null)
+    if ("error" in travel) return { error: travel.error }
+    overrides = travel
+  }
+
+  if (category === "hotels") {
+    if (!body.hotelSearch) {
+      return {
+        error:
+          "Complete hotel city, dates, and price — required for card ranking.",
+      }
     }
+    const hotel = parseHotelSearchBody(body.hotelSearch)
+    if (!hotel) {
+      return { error: "Invalid hotel search details." }
+    }
+    const valid = validateHotelSearch(hotel, { requirePrice: false })
+    if (!valid.ok) {
+      return { error: valid.message }
+    }
+    url = buildHotelReferenceUrl(hotel)
+    const travel = buildTravelOverrides("hotels", null, hotel)
+    if ("error" in travel) return { error: travel.error }
+    overrides = travel
   }
 
   if (!url) {
-    return { error: "Paste a product or booking URL, or complete flight details." }
+    return {
+      error:
+        "Paste a product URL, or complete flight / hotel search details.",
+    }
   }
 
   if (!isValidHttpUrl(url)) {

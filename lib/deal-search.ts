@@ -43,6 +43,18 @@ export type DealOffer = {
   is_pooled?: boolean
 }
 
+export type TravelListing = {
+  id: string
+  category: "flight" | "hotels"
+  provider: string
+  title: string
+  subtitle: string
+  price: number
+  meta: string[]
+  refundable: boolean
+  badge?: string
+}
+
 export type DealSearchResult = {
   product_title: string
   platform: string
@@ -55,6 +67,8 @@ export type DealSearchResult = {
   used_ai: boolean
   used_serper: boolean
   data_sources: string[]
+  travel_listings: TravelListing[]
+  selected_travel_listing_id: string | null
   market_offers: MarketOffer[]
   missing_card_teasers: MissingCardTeaser[]
   wallet_card_count: number
@@ -223,6 +237,8 @@ export function buildFallbackResult(
     used_ai: false,
     used_serper: false,
     data_sources: ["rules"],
+    travel_listings: [],
+    selected_travel_listing_id: null,
     market_offers: [],
     missing_card_teasers: [],
     wallet_card_count: searchCards.filter((c) => c.source === "wallet").length,

@@ -91,12 +91,39 @@ function bestWalletOffer(offers: DealOffer[]): DealOffer | null {
   )
 }
 
+/** Best ₹ off among wallet cards when full offer list is unavailable (e.g. Deals feed). */
+export function estimateWalletBestDiscount(
+  url: string,
+  estimatedPrice: number | null,
+  walletCards: SearchCardInput[],
+  serper: SerperDealContext
+): number {
+  if (estimatedPrice === null || estimatedPrice <= 0 || walletCards.length === 0) {
+    return 0
+  }
+
+  let best = 0
+  for (const card of walletCards) {
+    const platformHit = platformScoreForCard(url, card.card_id)
+    const serperPercent = extractSerperPercentForCard(serper, card)
+    const discountPercent = Math.max(
+      platformHit?.discountPercent ?? 0,
+      serperPercent ?? 0
+    )
+    if (discountPercent <= 0) continue
+    const amount = Math.round((estimatedPrice * discountPercent) / 100)
+    if (amount > best) best = amount
+  }
+  return best
+}
+
 export function buildMissingCardTeasers(input: {
   url: string
   estimatedPrice: number | null
   searchCards: SearchCardInput[]
   offers: DealOffer[]
   serper: SerperDealContext
+  walletBestAmount?: number
   limit?: number
 }): MissingCardTeaser[] {
   const { url, estimatedPrice, searchCards, offers, serper } = input
@@ -113,7 +140,8 @@ export function buildMissingCardTeasers(input: {
   }
 
   const walletBest = bestWalletOffer(offers)
-  const walletBestAmount = walletBest?.discount_amount ?? 0
+  const walletBestAmount =
+    input.walletBestAmount ?? walletBest?.discount_amount ?? 0
 
   const candidates: MissingCardTeaser[] = []
 

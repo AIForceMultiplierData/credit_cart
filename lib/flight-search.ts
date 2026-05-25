@@ -38,6 +38,7 @@ export type FlightSearchParams = {
   passengers: FlightPassengers
   cabinClass: FlightCabinClass
   estimatedFare: number | null
+  selectedListingId: string | null
   filters: FlightFilters
   sort: FlightSort
 }
@@ -109,6 +110,7 @@ export function defaultFlightSearchParams(): FlightSearchParams {
     passengers: { adults: 1, children: 0, infants: 0 },
     cabinClass: "economy",
     estimatedFare: null,
+    selectedListingId: null,
     filters: { hideNonRefundable: true, airlines: [], maxPrice: null },
     sort: "best_card",
   }
@@ -175,7 +177,8 @@ export function buildFlightReferenceUrl(params: FlightSearchParams): string {
 }
 
 export function validateFlightSearch(
-  params: FlightSearchParams
+  params: FlightSearchParams,
+  options?: { requirePrice?: boolean }
 ): { ok: true } | { ok: false; message: string } {
   if (!params.originCode.trim() || !params.destinationCode.trim()) {
     return { ok: false, message: "Select origin and destination airports." }
@@ -196,11 +199,16 @@ export function validateFlightSearch(
   ) {
     return { ok: false, message: "Return date must be on or after departure." }
   }
-  if (params.estimatedFare === null || params.estimatedFare <= 0) {
+  const requirePrice = options?.requirePrice !== false
+  if (
+    requirePrice &&
+    !params.selectedListingId &&
+    (params.estimatedFare === null || params.estimatedFare <= 0)
+  ) {
     return {
       ok: false,
       message:
-        "Enter the total fare (₹) from the booking page — required for exact card math.",
+        "Pick a flight below or enter total fare (₹) from the booking page.",
     }
   }
   if (params.passengers.adults < 1) {
@@ -249,6 +257,8 @@ export function parseFlightSearchBody(raw: unknown): FlightSearchParams | null {
       ? b.cabinClass
       : "economy") as FlightCabinClass,
     estimatedFare: Number.isFinite(fare) && fare > 0 ? Math.round(fare) : null,
+    selectedListingId:
+      typeof b.selectedListingId === "string" ? b.selectedListingId : null,
     filters: {
       hideNonRefundable: filtersRaw.hideNonRefundable !== false,
       airlines: Array.isArray(filtersRaw.airlines)

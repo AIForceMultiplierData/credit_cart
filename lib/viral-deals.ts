@@ -59,6 +59,16 @@ export const VIRAL_SHOPPING_QUERIES: Array<{
     query: "ebay trending electronics deals free shipping",
     fallbackUrl: "https://www.ebay.com",
   },
+  {
+    platform: "MakeMyTrip",
+    query: "makemytrip hotel deals India trending 2026",
+    fallbackUrl: "https://www.makemytrip.com/hotels/",
+  },
+  {
+    platform: "Booking.com",
+    query: "booking.com hotel offers India credit card",
+    fallbackUrl: "https://www.booking.com",
+  },
 ]
 
 export function missingTeaserToViralDeal(

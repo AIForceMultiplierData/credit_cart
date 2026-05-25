@@ -27,11 +27,16 @@ import {
   validateFlightSearch,
   type FlightSearchParams,
 } from "@/lib/flight-search"
-import { DealOfferDetail } from "@/components/deal-offer-detail"
+import {
+  defaultHotelSearchParams,
+  validateHotelSearch,
+  type HotelSearchParams,
+} from "@/lib/hotel-search"
+import { DealSearchResults } from "@/components/deal-search-results"
 import { FlightSearchForm } from "@/components/flight-search-form"
-import { formatInr } from "@/lib/deal-offer-breakdown"
-import { MissingCardTeasers } from "@/components/missing-card-teasers"
+import { HotelSearchForm } from "@/components/hotel-search-form"
 import { cn } from "@/lib/utils"
+
 type DealSearchBarProps = {
   onNeedWallet?: () => void
   onNeedSignIn?: () => void
@@ -47,13 +52,13 @@ const CATEGORY_OPTIONS: Array<{
     value: "flight",
     label: "Flight",
     icon: Plane,
-    placeholder: "Paste MakeMyTrip / Cleartrip / airline URL…",
+    placeholder: "",
   },
   {
     value: "hotels",
     label: "Hotels",
     icon: Hotel,
-    placeholder: "Paste Booking.com / OYO / hotel URL…",
+    placeholder: "",
   },
   {
     value: "product",
@@ -62,6 +67,8 @@ const CATEGORY_OPTIONS: Array<{
     placeholder: "Paste Amazon / Flipkart product URL…",
   },
 ]
+
+const TRAVEL_CATEGORIES = new Set<DealSearchCategory>(["flight", "hotels"])
 
 export function DealSearchBar({
   onNeedWallet,
@@ -75,12 +82,34 @@ export function DealSearchBar({
   const [flightSearch, setFlightSearch] = useState<FlightSearchParams>(
     defaultFlightSearchParams
   )
+  const [hotelSearch, setHotelSearch] = useState<HotelSearchParams>(
+    defaultHotelSearchParams
+  )
   const [searching, setSearching] = useState(false)
   const [result, setResult] = useState<DealSearchResult | null>(null)
 
   const selectedCategory =
     CATEGORY_OPTIONS.find((option) => option.value === category) ??
     CATEGORY_OPTIONS[2]
+
+  async function runSearch(body: Record<string, unknown>) {
+    const response = await fetch("/api/deals/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+
+    const payload = (await response.json()) as DealSearchResult & {
+      error?: string
+    }
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Search failed.")
+    }
+
+    setResult(payload)
+    toast.success("Results ready", { description: payload.summary })
+  }
 
   async function handleSearch() {
     if (!user) {
@@ -89,9 +118,7 @@ export function DealSearchBar({
     }
 
     if (cardsLoading) {
-      toast.message("Loading wallet cards…", {
-        description: "One moment — syncing your cards for deal search.",
-      })
+      toast.message("Loading wallet cards…")
       return
     }
 
@@ -104,15 +131,22 @@ export function DealSearchBar({
     }
 
     const trimmedUrl = url.trim()
+
     if (category === "flight") {
       const valid = validateFlightSearch(flightSearch)
       if (!valid.ok) {
         toast.error("Complete flight details", { description: valid.message })
         return
       }
+    } else if (category === "hotels") {
+      const valid = validateHotelSearch(hotelSearch)
+      if (!valid.ok) {
+        toast.error("Complete hotel details", { description: valid.message })
+        return
+      }
     } else if (!trimmedUrl) {
       toast.error("URL required", {
-        description: "Paste the product or booking link you want to optimize.",
+        description: "Paste the product link you want to optimize.",
       })
       return
     }
@@ -121,28 +155,12 @@ export function DealSearchBar({
     setResult(null)
 
     try {
-      const response = await fetch("/api/deals/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category,
-          url: category === "flight" ? "" : trimmedUrl,
-          searchCards,
-          ...(category === "flight" ? { flightSearch } : {}),
-        }),
-      })
-
-      const payload = (await response.json()) as DealSearchResult & {
-        error?: string
-      }
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Search failed.")
-      }
-
-      setResult(payload)
-      toast.success("Best card found", {
-        description: payload.summary,
+      await runSearch({
+        category,
+        url: TRAVEL_CATEGORIES.has(category) ? "" : trimmedUrl,
+        searchCards,
+        ...(category === "flight" ? { flightSearch } : {}),
+        ...(category === "hotels" ? { hotelSearch } : {}),
       })
     } catch (err) {
       const message =
@@ -152,6 +170,44 @@ export function DealSearchBar({
       setSearching(false)
     }
   }
+
+  async function handleListingSelect(listingId: string, price: number) {
+    if (!user || searchCards.length === 0) return
+
+    setSearching(true)
+    try {
+      if (category === "flight") {
+        const next: FlightSearchParams = {
+          ...flightSearch,
+          selectedListingId: listingId,
+          estimatedFare: price,
+        }
+        setFlightSearch(next)
+        await runSearch({ category, url: "", searchCards, flightSearch: next })
+      } else if (category === "hotels") {
+        const next: HotelSearchParams = {
+          ...hotelSearch,
+          selectedListingId: listingId,
+          estimatedTotal: price,
+        }
+        setHotelSearch(next)
+        await runSearch({ category, url: "", searchCards, hotelSearch: next })
+      }
+    } catch (err) {
+      toast.error("Could not update fare", {
+        description: err instanceof Error ? err.message : undefined,
+      })
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const helperCopy =
+    category === "flight"
+      ? "Route + dates → live flight picks → best wallet card → cards you could apply for bigger savings."
+      : category === "hotels"
+        ? "City + stay dates → live hotel picks → best wallet card → apply teasers below."
+        : "Paste a product URL — we rank wallet + circle cards with exact ₹ off."
 
   return (
     <div className="mb-6 space-y-4">
@@ -163,9 +219,7 @@ export function DealSearchBar({
           </p>
         </div>
         <p className="mb-4 text-xs leading-relaxed text-slate-400">
-          {category === "flight"
-            ? "Enter route, dates, and total fare (₹) from your OTA — we rank wallet + circle cards with exact ₹ off before you book."
-            : "Pick a category, paste any booking or product URL — we rank wallet + circle cards with exact ₹ off, pay amount, T&C, and 50/50 split when pooling."}
+          {helperCopy}
         </p>
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -187,11 +241,7 @@ export function DealSearchBar({
               {CATEGORY_OPTIONS.map((option) => {
                 const Icon = option.icon
                 return (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className="focus:bg-slate-800 focus:text-slate-50"
-                  >
+                  <SelectItem key={option.value} value={option.value}>
                     <span className="flex items-center gap-2">
                       <Icon className="h-4 w-4 text-emerald-400" />
                       {option.label}
@@ -202,17 +252,15 @@ export function DealSearchBar({
             </SelectContent>
           </Select>
 
-          {category !== "flight" ? (
+          {category === "product" ? (
             <Input
               type="url"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               placeholder={selectedCategory.placeholder}
-              className="h-11 flex-1 border-slate-700 bg-slate-950 text-slate-50 placeholder:text-slate-500"
+              className="h-11 flex-1 border-slate-700 bg-slate-950 text-slate-50"
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  void handleSearch()
-                }
+                if (event.key === "Enter") void handleSearch()
               }}
             />
           ) : null}
@@ -227,6 +275,12 @@ export function DealSearchBar({
           </div>
         ) : null}
 
+        {category === "hotels" ? (
+          <div className="mt-3">
+            <HotelSearchForm value={hotelSearch} onChange={setHotelSearch} />
+          </div>
+        ) : null}
+
         <Button
           type="button"
           disabled={searching || authLoading || cardsLoading}
@@ -236,12 +290,14 @@ export function DealSearchBar({
           {searching ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Finding best card…
+              Searching…
             </>
           ) : (
             <>
               <Search className="mr-2 h-4 w-4" />
-              Find best deal with my cards
+              {TRAVEL_CATEGORIES.has(category)
+                ? "Search & rank my cards"
+                : "Find best deal with my cards"}
             </>
           )}
         </Button>
@@ -251,109 +307,19 @@ export function DealSearchBar({
             Comparing {walletCount} wallet + {circleCount} circle card
             {walletCount + circleCount === 1 ? "" : "s"}
           </p>
-        ) : user && cardsLoading ? (
-          <p className="mt-2 text-center text-xs text-slate-500">
-            Syncing wallet cards…
-          </p>
-        ) : user && !cardsLoading ? (
-          <p className="mt-2 text-center text-xs text-amber-300/90">
-            No cards in wallet — add one to search
-          </p>
         ) : null}
       </div>
 
       {result ? (
-        <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-4 backdrop-blur-md">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                Best card — exact ₹ breakdown
-              </p>
-              <h3 className="mt-1 truncate text-base font-bold text-slate-50">
-                {result.product_title}
-              </h3>
-              <p className="text-xs text-slate-500">
-                {result.platform} · {result.category}
-                {result.used_serper ? " · Serper live" : ""}
-                {result.used_ai ? " · AI ranked" : " · rule-based estimate"}
-              </p>
-              {result.data_sources.length > 0 ? (
-                <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-600">
-                  Sources: {result.data_sources.join(" + ")}
-                </p>
-              ) : null}
-            </div>
-            {result.estimated_price !== null ? (
-              <div className="shrink-0 text-right">
-                <p className="text-[10px] uppercase text-slate-500">Est. price</p>
-                <p className="font-mono text-sm font-bold text-slate-200">
-                  {formatInr(result.estimated_price)}
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          {result.best_offer ? (
-            <div className="mb-3">
-              <DealOfferDetail offer={result.best_offer} highlight />
-            </div>
-          ) : null}
-
-          {result.missing_card_teasers?.length ? (
-            <MissingCardTeasers
-              teasers={result.missing_card_teasers}
-              estimatedPrice={result.estimated_price}
-              onNeedSignIn={onNeedSignIn}
-            />
-          ) : null}
-
-          <p className="mb-3 text-sm text-slate-400">{result.summary}</p>
-
-          {result.market_offers.length > 0 ? (
-            <div className="mb-3 space-y-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-300">
-                Live offers found (Serper)
-              </p>
-              {result.market_offers.slice(0, 4).map((offer, index) => (
-                <div
-                  key={`${offer.title}-${index}`}
-                  className="border-t border-slate-800/60 pt-2 first:border-0 first:pt-0"
-                >
-                  <p className="text-xs font-medium text-slate-200">
-                    {offer.title}
-                  </p>
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500">
-                    {offer.snippet}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-blue-400/80">
-                    {offer.source}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {result.offers.length > 1 ? (
-            <div className="space-y-3 border-t border-slate-800/60 pt-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                All cards (wallet + circle)
-              </p>
-              {result.offers.map((offer) => (
-                <div
-                  key={`${offer.card_id}:${offer.owner_user_id ?? "self"}`}
-                  className={cn(
-                    "rounded-xl border p-3",
-                    offer.recommended
-                      ? "border-emerald-500/30 bg-emerald-500/5"
-                      : "border-slate-800/50 bg-slate-950/20"
-                  )}
-                >
-                  <DealOfferDetail offer={offer} compact />
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <DealSearchResults
+          result={result}
+          onSelectListing={
+            TRAVEL_CATEGORIES.has(category)
+              ? (id, price) => void handleListingSelect(id, price)
+              : undefined
+          }
+          onNeedSignIn={onNeedSignIn}
+        />
       ) : null}
     </div>
   )
