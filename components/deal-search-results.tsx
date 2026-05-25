@@ -91,6 +91,23 @@ export function DealSearchResults({
           category={travelCategory}
           flightSearch={flightSearch}
           hotelSearch={hotelSearch}
+          platform={result.platform}
+          bestCardLabel={
+            result.best_offer
+              ? `${result.best_offer.bank_name} ${result.best_offer.card_name}`
+              : null
+          }
+          onApplyCard={onApplyBestCard}
+        />
+      ) : null}
+
+      {result.category === "product" && result.source_url ? (
+        <TravelBookCta
+          className="mb-3"
+          category="product"
+          sourceUrl={result.source_url}
+          platform={result.platform}
+          productTitle={result.product_title}
           bestCardLabel={
             result.best_offer
               ? `${result.best_offer.bank_name} ${result.best_offer.card_name}`

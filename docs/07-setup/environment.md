@@ -10,11 +10,13 @@
 | `CEREBRAS_KEYS` | No | No | LLM fallback |
 | `GEMINI_KEYS` | No | No | LLM fallback |
 | `GOOGLE_MAPS_API_KEY` | For hotels | No | Places + map embed for hotel destination |
-| `NEXT_PUBLIC_TRAVELPAYOUTS_MARKER` | No | Yes | Travelpayouts affiliate wrapper for OTA deep links |
+| `NEXT_PUBLIC_TRAVELPAYOUTS_MARKER` | No | Yes | Flights + hotels via [Travelpayouts](https://www.travelpayouts.com) |
+| `NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG` | No | Yes | Amazon India `tag=` on product URLs |
+| `NEXT_PUBLIC_FLIPKART_AFFILIATE_ID` | No | Yes | Flipkart `affid=` on product URLs |
 
 \*App works in degraded mode without them (rules-only deals, empty viral feed).
 
-Without `NEXT_PUBLIC_TRAVELPAYOUTS_MARKER`, flight/hotel “Book on MakeMyTrip / Booking.com” buttons still open the OTA with search pre-filled — you just skip commission tracking until you add your marker from [Travelpayouts](https://www.travelpayouts.com).
+Leave affiliate vars **empty** in `.env.example` / Vercel until you have IDs. OTA and store links still open with search pre-filled; commission tracking turns on automatically once you set the variable and redeploy.
 
 ---
 

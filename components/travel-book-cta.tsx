@@ -1,21 +1,25 @@
 "use client"
 
-import { ExternalLink, Plane, Hotel } from "lucide-react"
+import { ExternalLink, Hotel, Package, Plane } from "lucide-react"
 import type { FlightSearchParams } from "@/lib/flight-search"
 import type { HotelSearchParams } from "@/lib/hotel-search"
 import {
   buildFlightAffiliateLinks,
   buildHotelAffiliateLinks,
-  primaryTravelBookLabel,
-  type TravelAffiliateLink,
-} from "@/lib/travel-affiliate-links"
+  buildProductAffiliateLinks,
+  primaryAffiliateBookLabel,
+  type AffiliateLink,
+} from "@/lib/affiliate-links"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-type TravelBookCtaProps = {
-  category: "flight" | "hotels"
+type AffiliateBookCtaProps = {
+  category: "flight" | "hotels" | "product"
   flightSearch?: FlightSearchParams | null
   hotelSearch?: HotelSearchParams | null
+  sourceUrl?: string | null
+  platform?: string | null
+  productTitle?: string | null
   bestCardLabel?: string | null
   onApplyCard?: () => void
   className?: string
@@ -25,7 +29,7 @@ function PartnerButton({
   link,
   variant,
 }: {
-  link: TravelAffiliateLink
+  link: AffiliateLink
   variant: "primary" | "secondary"
 }) {
   const isPrimary = variant === "primary"
@@ -52,30 +56,44 @@ function PartnerButton({
   )
 }
 
-export function TravelBookCta({
-  category,
-  flightSearch,
-  hotelSearch,
-  bestCardLabel,
-  onApplyCard,
-  className,
-}: TravelBookCtaProps) {
-  const links =
-    category === "flight" && flightSearch
-      ? buildFlightAffiliateLinks(flightSearch)
-      : category === "hotels" && hotelSearch
-        ? buildHotelAffiliateLinks(hotelSearch)
-        : []
+function resolveLinks(props: AffiliateBookCtaProps): AffiliateLink[] {
+  const { category, flightSearch, hotelSearch, sourceUrl, platform, productTitle } =
+    props
+
+  if (category === "flight" && flightSearch) {
+    return buildFlightAffiliateLinks(flightSearch)
+  }
+  if (category === "hotels" && hotelSearch) {
+    return buildHotelAffiliateLinks(hotelSearch)
+  }
+  if (category === "product" && sourceUrl?.trim()) {
+    return buildProductAffiliateLinks(
+      sourceUrl.trim(),
+      platform ?? "Store",
+      productTitle ?? undefined
+    )
+  }
+  return []
+}
+
+/** OTA / marketplace checkout CTAs after card ranking */
+export function TravelBookCta(props: AffiliateBookCtaProps) {
+  const { category, bestCardLabel, onApplyCard, className, platform } = props
+  const links = resolveLinks(props)
 
   if (links.length === 0) return null
 
   const primary = links.find((l) => l.primary) ?? links[0]
   const alternates = links.filter((l) => l.partner !== primary.partner)
-  const Icon = category === "flight" ? Plane : Hotel
+  const Icon =
+    category === "flight" ? Plane : category === "hotels" ? Hotel : Package
+
   const headline =
     category === "flight"
       ? "Continue on OTA — dates & route pre-filled"
-      : "Continue on OTA — stay dates pre-filled"
+      : category === "hotels"
+        ? "Continue on OTA — stay dates pre-filled"
+        : "Continue to store — your product link opens with affiliate tracking when configured"
 
   return (
     <div
@@ -88,11 +106,13 @@ export function TravelBookCta({
         <Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
-            Book with your best card
+            {category === "product"
+              ? "Checkout with your best card"
+              : "Book with your best card"}
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
-            {headline}. No live pricing in PoolPay — you rank cards here, then
-            checkout on the partner site.
+            {headline}. Rank cards in PoolPay, then complete purchase on the
+            partner site.
           </p>
         </div>
       </div>
@@ -111,7 +131,7 @@ export function TravelBookCta({
 
       <PartnerButton link={primary} variant="primary" />
       <p className="mt-2 text-center text-[10px] font-medium text-slate-500">
-        {primaryTravelBookLabel(category, bestCardLabel)}
+        {primaryAffiliateBookLabel(category, bestCardLabel, platform)}
       </p>
 
       {alternates.length > 0 ? (
