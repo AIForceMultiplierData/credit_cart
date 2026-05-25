@@ -47,13 +47,35 @@ type BankOption = {
   bank_name: string
   bank_id: string
   bank_logo_url: string
+  brand_color: string
   display_order: number
+}
+
+const BANK_LOGO_BOX = "h-[3.25rem] w-[3.25rem]" /* ~30% larger than h-10 logo */
+
+function toBankOption(row: {
+  bank_id: string
+  bank_name: string
+  logo_url?: string | null
+  bank_logo_url?: string | null
+  brand_color?: string | null
+  display_order: number
+}): BankOption {
+  const profile = resolveBankProfile(row.bank_name, row.bank_id)
+  return {
+    bank_id: row.bank_id,
+    bank_name: row.bank_name,
+    bank_logo_url: row.logo_url ?? row.bank_logo_url ?? profile.logo_url,
+    brand_color: row.brand_color ?? profile.brand_color,
+    display_order: row.display_order,
+  }
 }
 
 type CardBankRow = {
   bank_id: string
   bank_name: string
   logo_url: string
+  brand_color?: string | null
   display_order: number
 }
 
@@ -182,12 +204,14 @@ export function AddCardModal({
 
       const staticFallback = catalogRowsFromStaticCatalog()
       const staticBanks = BANK_REGISTRY.filter((b) => b.bank_id !== "default").map(
-        (b) => ({
-          bank_id: b.bank_id,
-          bank_name: b.bank_name,
-          bank_logo_url: b.logo_url,
-          display_order: b.display_order,
-        })
+        (b) =>
+          toBankOption({
+            bank_id: b.bank_id,
+            bank_name: b.bank_name,
+            logo_url: b.logo_url,
+            brand_color: b.brand_color,
+            display_order: b.display_order,
+          })
       )
 
       try {
@@ -201,7 +225,7 @@ export function AddCardModal({
             .returns<CardCatalogSelect[]>(),
           supabase
             .from("card_banks")
-            .select("bank_id, bank_name, logo_url, display_order")
+            .select("bank_id, bank_name, logo_url, brand_color, display_order")
             .eq("is_active", true)
             .order("display_order", { ascending: true })
             .returns<CardBankRow[]>(),
@@ -242,12 +266,15 @@ export function AddCardModal({
           }
         }
 
-        const banksFromDb = (banksResult.data ?? []).map((row) => ({
-          bank_id: row.bank_id,
-          bank_name: row.bank_name,
-          bank_logo_url: row.logo_url,
-          display_order: row.display_order,
-        }))
+        const banksFromDb = (banksResult.data ?? []).map((row) =>
+          toBankOption({
+            bank_id: row.bank_id,
+            bank_name: row.bank_name,
+            logo_url: row.logo_url,
+            brand_color: row.brand_color,
+            display_order: row.display_order,
+          })
+        )
 
         setBankOptions(banksFromDb.length > 0 ? banksFromDb : staticBanks)
       } catch (err) {
@@ -380,25 +407,33 @@ export function AddCardModal({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
                     {bankOptions.map((bank) => (
                       <button
                         key={bank.bank_id}
                         type="button"
                         onClick={() => setSelectedBankId(bank.bank_id)}
-                        className={cn(
-                          "flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/40 p-3 transition-all",
-                          "hover:border-slate-500 hover:bg-slate-800/50 active:scale-[0.98]"
-                        )}
+                        className="group flex flex-col items-center gap-1.5 rounded-lg p-0.5 transition-transform active:scale-[0.97]"
                       >
-                        <BankLogo
-                          bankName={bank.bank_name}
-                          bankId={bank.bank_id}
-                          logoUrl={bank.bank_logo_url}
-                          className="flex h-11 w-full items-center justify-center"
-                          imageClassName="h-11 w-auto max-h-11 max-w-[4.5rem] object-contain"
-                        />
-                        <span className="line-clamp-1 text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                        <div
+                          className={cn(
+                            BANK_LOGO_BOX,
+                            "flex shrink-0 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/50 p-1 transition-colors",
+                            "group-hover:border-slate-500 group-hover:bg-slate-800/60"
+                          )}
+                        >
+                          <BankLogo
+                            bankName={bank.bank_name}
+                            bankId={bank.bank_id}
+                            logoUrl={bank.bank_logo_url}
+                            className="flex h-10 w-full items-center justify-center"
+                            imageClassName="h-10 w-auto max-h-10 max-w-[2.35rem] object-contain"
+                          />
+                        </div>
+                        <span
+                          className="line-clamp-1 max-w-[3.25rem] text-center text-[9px] font-semibold uppercase leading-tight tracking-wide"
+                          style={{ color: bank.brand_color }}
+                        >
                           {bank.bank_name}
                         </span>
                       </button>
