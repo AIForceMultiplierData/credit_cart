@@ -84,7 +84,14 @@ exception
   when others then null;
 end $$;
 
--- Generate slugs from bank + card name (works when card_id is uuid)
+-- Rename legacy slugs → live catalog ids (safe before/after live seed)
+update public.card_catalog set card_slug = 'hdfc_regalia_gold' where card_slug = 'hdfc_regalia';
+update public.card_catalog set card_slug = 'hdfc_diners_black' where card_slug in ('hdfc_diners', 'hdfc_diners_black') and card_name ilike '%diners%black%';
+update public.card_catalog set card_slug = 'icici_amazon_pay' where card_slug = 'icici_amazon';
+update public.card_catalog set card_slug = 'icici_emeralde_private' where card_slug = 'icici_emeralde';
+update public.card_catalog set card_slug = 'axis_my_zone' where card_slug = 'axis_flipkart' and card_name ilike '%my zone%';
+
+-- Backfill missing slugs from bank + card name (uuid tables only)
 update public.card_catalog
 set card_slug = lower(
   regexp_replace(trim(bank_name), '[^a-zA-Z0-9]+', '_', 'g')
@@ -92,31 +99,6 @@ set card_slug = lower(
   || regexp_replace(trim(card_name), '[^a-zA-Z0-9]+', '_', 'g')
 )
 where card_slug is null or card_slug = '';
-
--- Known slug overrides (canonical app ids)
-update public.card_catalog set card_slug = 'hdfc_millennia' where upper(bank_name) = 'HDFC' and card_name ilike '%millennia%';
-update public.card_catalog set card_slug = 'hdfc_regalia' where upper(bank_name) = 'HDFC' and card_name ilike '%regalia%';
-update public.card_catalog set card_slug = 'hdfc_diners' where upper(bank_name) = 'HDFC' and (card_name ilike '%diners%' or card_name ilike '%black%');
-update public.card_catalog set card_slug = 'sbi_cashback' where upper(bank_name) = 'SBI' and card_name ilike '%cashback%';
-update public.card_catalog set card_slug = 'sbi_simplyclick' where upper(bank_name) = 'SBI' and card_name ilike '%simplyclick%';
-update public.card_catalog set card_slug = 'icici_amazon' where upper(bank_name) = 'ICICI' and card_name ilike '%amazon%';
-update public.card_catalog set card_slug = 'icici_sapphiro' where upper(bank_name) = 'ICICI' and card_name ilike '%sapphiro%';
-update public.card_catalog set card_slug = 'icici_coral' where upper(bank_name) = 'ICICI' and card_name ilike '%coral%';
-update public.card_catalog set card_slug = 'icici_emeralde' where upper(bank_name) = 'ICICI' and card_name ilike '%emeralde%';
-update public.card_catalog set card_slug = 'icici_rubyx' where upper(bank_name) = 'ICICI' and card_name ilike '%rubyx%';
-update public.card_catalog set card_slug = 'axis_flipkart' where upper(bank_name) = 'AXIS' and card_name ilike '%flipkart%';
-update public.card_catalog set card_slug = 'axis_magnus' where upper(bank_name) = 'AXIS' and card_name ilike '%magnus%';
-update public.card_catalog set card_slug = 'axis_vistara' where upper(bank_name) = 'AXIS' and card_name ilike '%vistara%';
-update public.card_catalog set card_slug = 'axis_airtel' where upper(bank_name) = 'AXIS' and card_name ilike '%airtel%';
-update public.card_catalog set card_slug = 'hdfc_swiggy' where upper(bank_name) = 'HDFC' and card_name ilike '%swiggy%';
-update public.card_catalog set card_slug = 'hdfc_tata_neu' where upper(bank_name) = 'HDFC' and card_name ilike '%neu%';
-update public.card_catalog set card_slug = 'hdfc_freedom' where upper(bank_name) = 'HDFC' and card_name ilike '%freedom%';
-update public.card_catalog set card_slug = 'hdfc_bizgrow' where upper(bank_name) = 'HDFC' and card_name ilike '%bizgrow%';
-update public.card_catalog set card_slug = 'hdfc_iocl' where upper(bank_name) = 'HDFC' and (card_name ilike '%indianoil%' or card_name ilike '%iocl%');
-update public.card_catalog set card_slug = 'hdfc_irctc' where upper(bank_name) = 'HDFC' and card_name ilike '%irctc%';
-update public.card_catalog set card_slug = 'hdfc_pixel_play' where upper(bank_name) = 'HDFC' and card_name ilike '%pixel%play%';
-update public.card_catalog set card_slug = 'sbi_elite' where upper(bank_name) = 'SBI' and card_name ilike '%elite%' and card_name not ilike '%business%';
-update public.card_catalog set card_slug = 'sbi_prime' where upper(bank_name) = 'SBI' and card_name ilike '%prime%' and card_name not ilike '%vistara%';
 
 -- Step 2b: Live product master (240 cards) — run entire file next:
 --   supabase/card_catalog_live_seed.sql

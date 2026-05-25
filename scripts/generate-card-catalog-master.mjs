@@ -372,19 +372,13 @@ begin
     from (values
 ${valueLines.join(",\n")}
     ) as v(bank_name, card_name, style_classes, card_slug, bank_id, card_image_url)
-    where not exists (select 1 from public.card_catalog c where c.card_slug = v.card_slug);
-
-    update public.card_catalog c set
-      bank_name = v.bank_name,
-      card_name = v.card_name,
-      style_classes = v.style_classes,
-      bank_id = v.bank_id,
-      card_image_url = v.card_image_url,
-      is_active = true
-    from (values
-${valueLines.join(",\n")}
-    ) as v(bank_name, card_name, style_classes, card_slug, bank_id, card_image_url)
-    where c.card_slug = v.card_slug;
+    on conflict (card_slug) where (card_slug is not null) do update set
+      bank_name = excluded.bank_name,
+      card_name = excluded.card_name,
+      style_classes = excluded.style_classes,
+      bank_id = excluded.bank_id,
+      card_image_url = excluded.card_image_url,
+      is_active = true;
   else
     insert into public.card_catalog (card_id, bank_name, card_name, style_classes, card_slug, bank_id, card_image_url, is_active)
     select v.card_slug, v.bank_name, v.card_name, v.style_classes, v.card_slug, v.bank_id, v.card_image_url, true
@@ -400,6 +394,11 @@ ${valueLines.join(",\n")}
       card_image_url = excluded.card_image_url,
       is_active = true;
   end if;
+
+  -- Legacy slug aliases (run after upsert)
+  update public.card_catalog set card_slug = 'hdfc_regalia_gold' where card_slug = 'hdfc_regalia';
+  update public.card_catalog set card_slug = 'icici_amazon_pay' where card_slug = 'icici_amazon';
+  update public.card_catalog set card_slug = 'icici_emeralde_private' where card_slug = 'icici_emeralde';
 end $$;
 `
 
@@ -414,6 +413,18 @@ function stripMasterRunNextHints(masterSql) {
   return masterSql.replace(
     /-- Step 2b: Live product master[^\n]*\n--[^\n]*\n-- Regenerate from scripts\/generate-card-catalog-master\.mjs after edits\.\n\n/g,
     ""
+  )
+}
+
+/** In full_setup bundle: live seed sets slugs; skip pre-seed slug overrides that collide. */
+function stripPreSeedSlugOverrides(masterSql) {
+  const start = masterSql.indexOf("-- Rename legacy slugs")
+  const end = masterSql.indexOf("create unique index if not exists card_catalog_card_slug_key")
+  if (start === -1 || end === -1 || end <= start) return masterSql
+  return (
+    masterSql.slice(0, start) +
+    "-- (Pre-seed slug overrides omitted in full_setup — live seed upserts by card_slug.)\n\n" +
+    masterSql.slice(end)
   )
 }
 
@@ -440,12 +451,17 @@ let bundleSql = bundleHeader
 for (const part of bundleParts) {
   let content = fs.readFileSync(path.join(ROOT, "supabase", part.file), "utf8")
   if (part.file === "card_catalog_master.sql") {
-    content = stripMasterRunNextHints(content)
+    content = stripPreSeedSlugOverrides(stripMasterRunNextHints(content))
   }
   bundleSql += sectionBanner(part.name, part.file) + content
 }
 
 bundleSql += `
+-- ── Legacy slug cleanup (after live seed) ─────────────────────────────────────
+update public.card_catalog set card_slug = 'hdfc_regalia_gold' where card_slug = 'hdfc_regalia';
+update public.card_catalog set card_slug = 'icici_amazon_pay' where card_slug = 'icici_amazon';
+update public.card_catalog set card_slug = 'icici_emeralde_private' where card_slug = 'icici_emeralde';
+
 -- ── Verify (optional) ─────────────────────────────────────────────────────────
 select count(*) as bank_count from public.card_banks;
 select count(*) as active_cards from public.card_catalog where is_active = true;
