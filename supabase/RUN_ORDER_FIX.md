@@ -8,21 +8,21 @@ Analytics failed because `card_banks` was never created (first script stopped at
 
 ## Run in this order
 
-### 1. Card master (fixed script)
+### Option A — One file (recommended)
 
 In SQL Editor, run the **entire** file:
 
-`supabase/card_catalog_master.sql`
+`supabase/card_catalog_full_setup.sql`
 
-This will:
+Combines base table + banks master + 230-card live seed in one paste.
 
-- Create `card_banks` (`bank_id` = `hdfc`, `icici`, `sbi` — not card slugs)
-- Add `card_slug` (app card id like `hdfc_millennia`)
-- Create `card_catalog_master` view
+### Option B — Three files
 
-### 1b. Live card catalog (230 products)
+#### 1. Card master (fixed script)
 
-After step 1 succeeds, run:
+`supabase/card_catalog_master.sql` (after `card_catalog.sql` if table missing)
+
+#### 1b. Live card catalog (230 products)
 
 `supabase/card_catalog_live_seed.sql`
 

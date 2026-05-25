@@ -405,6 +405,55 @@ end $$;
 
 fs.writeFileSync(path.join(ROOT, "supabase", "card_catalog_live_seed.sql"), sql)
 
+// ── Single-run bundle (catalog.sql + master.sql + live_seed.sql) ─────────────
+function sectionBanner(name, partFile) {
+  return `\n\n-- ═══════════════════════════════════════════════════════════════════════════\n-- ${name}\n-- Source: supabase/${partFile}\n-- ═══════════════════════════════════════════════════════════════════════════\n\n`
+}
+
+function stripMasterRunNextHints(masterSql) {
+  return masterSql.replace(
+    /-- Step 2b: Live product master[^\n]*\n--[^\n]*\n-- Regenerate from scripts\/generate-card-catalog-master\.mjs after edits\.\n\n/g,
+    ""
+  )
+}
+
+const bundleHeader = `-- PoolPay CARD CATALOG — single-run bundle (AUTO-GENERATED)
+-- Paste and run this ENTIRE file once in Supabase Dashboard → SQL Editor.
+-- Regenerate: node scripts/generate-card-catalog-master.mjs
+--
+-- Combines (in order):
+--   1. supabase/card_catalog.sql         — base table + legacy seed
+--   2. supabase/card_catalog_master.sql  — card_banks, columns, view
+--   3. supabase/card_catalog_live_seed.sql — ${cards.length} live cards upsert
+--
+-- Recommended prerequisite (run separately if needed): supabase/profiles.sql
+
+`
+
+const bundleParts = [
+  { name: "PART 1/3 — Base card_catalog table", file: "card_catalog.sql" },
+  { name: "PART 2/3 — Banks master + card_catalog_master view", file: "card_catalog_master.sql" },
+  { name: `PART 3/3 — Live seed (${cards.length} cards)`, file: "card_catalog_live_seed.sql" },
+]
+
+let bundleSql = bundleHeader
+for (const part of bundleParts) {
+  let content = fs.readFileSync(path.join(ROOT, "supabase", part.file), "utf8")
+  if (part.file === "card_catalog_master.sql") {
+    content = stripMasterRunNextHints(content)
+  }
+  bundleSql += sectionBanner(part.name, part.file) + content
+}
+
+bundleSql += `
+-- ── Verify (optional) ─────────────────────────────────────────────────────────
+select count(*) as bank_count from public.card_banks;
+select count(*) as active_cards from public.card_catalog where is_active = true;
+select card_slug, bank_name, card_name from public.card_catalog_master limit 10;
+`
+
+fs.writeFileSync(path.join(ROOT, "supabase", "card_catalog_full_setup.sql"), bundleSql)
+
 // ── TypeScript catalog ────────────────────────────────────────────────────────
 const ts = `/** AUTO-GENERATED — run: node scripts/generate-card-catalog-master.mjs */
 import { BANK_REGISTRY } from "@/lib/bank-registry"
@@ -466,5 +515,7 @@ const legacyAliases = {
   axis_vistara_infinite: ["axis_vistara"],
 }
 
-console.log(`Generated ${cards.length} cards → supabase/card_catalog_live_seed.sql, lib/card-catalog.generated.ts`)
+console.log(
+  `Generated ${cards.length} cards → supabase/card_catalog_live_seed.sql, supabase/card_catalog_full_setup.sql, lib/card-catalog.generated.ts`
+)
 console.log("Legacy photo aliases still in card-photo-registry:", Object.keys(legacyAliases).join(", "))
