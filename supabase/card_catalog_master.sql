@@ -114,20 +114,57 @@ update public.card_catalog set card_slug = 'hdfc_pixel_play' where upper(bank_na
 update public.card_catalog set card_slug = 'sbi_elite' where upper(bank_name) = 'SBI' and card_name ilike '%elite%' and card_name not ilike '%business%';
 update public.card_catalog set card_slug = 'sbi_prime' where upper(bank_name) = 'SBI' and card_name ilike '%prime%' and card_name not ilike '%vistara%';
 
--- Seed HDFC cards that exist as photos but may be missing from card_catalog
-insert into public.card_catalog (card_id, bank_name, card_name, style_classes, card_slug, is_active) values
-  ('hdfc_bizgrow', 'HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100', 'hdfc_bizgrow', true),
-  ('hdfc_iocl', 'HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100', 'hdfc_iocl', true),
-  ('hdfc_irctc', 'HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100', 'hdfc_irctc', true),
-  ('hdfc_pixel_play', 'HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100', 'hdfc_pixel_play', true),
-  ('hdfc_swiggy', 'HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy', true),
-  ('hdfc_freedom', 'HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom', true)
-on conflict (card_id) do update set
-  bank_name = excluded.bank_name,
-  card_name = excluded.card_name,
-  style_classes = excluded.style_classes,
-  card_slug = excluded.card_slug,
-  is_active = true;
+-- Seed cards missing from catalog (never put slugs in card_id when PK is uuid)
+do $$
+declare
+  card_id_type text;
+begin
+  select c.data_type
+  into card_id_type
+  from information_schema.columns c
+  where c.table_schema = 'public'
+    and c.table_name = 'card_catalog'
+    and c.column_name = 'card_id';
+
+  if card_id_type = 'uuid' then
+    insert into public.card_catalog (bank_name, card_name, style_classes, card_slug, is_active)
+    select v.bank_name, v.card_name, v.style_classes, v.card_slug, true
+    from (
+      values
+        ('HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100', 'hdfc_bizgrow'),
+        ('HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100', 'hdfc_iocl'),
+        ('HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100', 'hdfc_irctc'),
+        ('HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100', 'hdfc_pixel_play'),
+        ('HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy'),
+        ('HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom'),
+        ('SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white', 'sbi_elite'),
+        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime')
+    ) as v(bank_name, card_name, style_classes, card_slug)
+    where not exists (
+      select 1 from public.card_catalog c where c.card_slug = v.card_slug
+    );
+  else
+    insert into public.card_catalog (card_id, bank_name, card_name, style_classes, card_slug, is_active)
+    select v.card_slug, v.bank_name, v.card_name, v.style_classes, v.card_slug, true
+    from (
+      values
+        ('HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100', 'hdfc_bizgrow'),
+        ('HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100', 'hdfc_iocl'),
+        ('HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100', 'hdfc_irctc'),
+        ('HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100', 'hdfc_pixel_play'),
+        ('HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy'),
+        ('HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom'),
+        ('SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white', 'sbi_elite'),
+        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime')
+    ) as v(bank_name, card_name, style_classes, card_slug)
+    on conflict (card_id) do update set
+      bank_name = excluded.bank_name,
+      card_name = excluded.card_name,
+      style_classes = excluded.style_classes,
+      card_slug = excluded.card_slug,
+      is_active = true;
+  end if;
+end $$;
 
 -- Card face photos (public/images/cards — app uses resolveCardImageUrl; SVG fallback if missing)
 update public.card_catalog set card_image_url = '/images/cards/hdfc_millenia.jpeg' where card_slug = 'hdfc_millennia';
