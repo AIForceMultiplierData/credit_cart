@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   Hotel,
   Loader2,
@@ -35,7 +35,15 @@ import {
 import { DealSearchResults } from "@/components/deal-search-results"
 import { FlightSearchForm } from "@/components/flight-search-form"
 import { HotelSearchForm } from "@/components/hotel-search-form"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+
+const DEAL_FINDER_HELP =
+  "Pick a category, paste any booking or product URL — we rank wallet + circle cards with exact ₹ off, pay amount, T&C, and 50/50 split when pooling. Flights and hotels: enter trip details, pick a live fare, then see the best card and cards you could apply for bigger savings."
 
 type DealSearchBarProps = {
   onNeedWallet?: () => void
@@ -87,6 +95,17 @@ export function DealSearchBar({
   )
   const [searching, setSearching] = useState(false)
   const [result, setResult] = useState<DealSearchResult | null>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  const showHelpTooltip = useCallback(() => {
+    setHelpOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (!helpOpen) return
+    const timer = window.setTimeout(() => setHelpOpen(false), 3000)
+    return () => window.clearTimeout(timer)
+  }, [helpOpen])
 
   const selectedCategory =
     CATEGORY_OPTIONS.find((option) => option.value === category) ??
@@ -202,25 +221,32 @@ export function DealSearchBar({
     }
   }
 
-  const helperCopy =
-    category === "flight"
-      ? "Route + dates → live flight picks → best wallet card → cards you could apply for bigger savings."
-      : category === "hotels"
-        ? "City + stay dates → live hotel picks → best wallet card → apply teasers below."
-        : "Paste a product URL — we rank wallet + circle cards with exact ₹ off."
-
   return (
     <div className="mb-6 space-y-4">
       <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-slate-900/80 to-blue-500/10 p-4 backdrop-blur-md">
-        <div className="mb-3 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-emerald-400" />
-          <p className="text-sm font-semibold text-emerald-300">
-            AI deal finder — your wallet cards
-          </p>
-        </div>
-        <p className="mb-4 text-xs leading-relaxed text-slate-400">
-          {helperCopy}
-        </p>
+        <Tooltip open={helpOpen} onOpenChange={setHelpOpen}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={showHelpTooltip}
+              className="mb-4 flex items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+              aria-label="Get Best Deals — show how it works"
+            >
+              <Sparkles className="h-4 w-4 shrink-0 text-emerald-400" />
+              <span className="text-sm font-semibold text-emerald-300">
+                Get Best Deals
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            align="start"
+            sideOffset={6}
+            className="max-w-[min(100vw-2rem,320px)] border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs leading-relaxed text-slate-200 [&>svg]:fill-slate-900 [&>svg]:bg-slate-900"
+          >
+            {DEAL_FINDER_HELP}
+          </TooltipContent>
+        </Tooltip>
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <Select
