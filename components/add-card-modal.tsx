@@ -231,11 +231,11 @@ export function AddCardModal({
           setCatalogData(fallbackRows)
           if (error && fallbackRows.length > 0) {
             setCatalogError(
-              "Using built-in catalog — run card_catalog_master.sql in Supabase for live sync."
+              "Using built-in card list — live catalog will load when available."
             )
           } else if (error) {
             setCatalogError(
-              "Catalog unavailable. Run card_catalog_master.sql in Supabase for live sync."
+              "Catalog unavailable right now. Showing built-in cards."
             )
           } else {
             setCatalogError(null)
@@ -259,8 +259,8 @@ export function AddCardModal({
         setBankOptions(staticBanks)
         setCatalogError(
           staticFallback.length > 0 || staticBanks.length > 0
-            ? "Using built-in catalog — run card_catalog_master.sql in Supabase for live sync."
-            : `${message} Run card_catalog_master.sql in Supabase.`
+            ? "Using built-in card list — live catalog will load when available."
+            : "Couldn't load the card catalog. Try again in a moment."
         )
       } finally {
         if (!cancelled) {
@@ -329,7 +329,7 @@ export function AddCardModal({
                 ? "Confirm and add this card to your trusted circle wallet."
                 : selectedBankId
                   ? `Cards from ${selectedBank?.bank_name ?? "this bank"}.`
-                  : "Pick a bank — logos from your live Supabase catalog."}
+                  : "Pick your bank to browse available cards."}
             </DialogDescription>
           </DialogHeader>
           {selectedBankId && (
@@ -361,7 +361,7 @@ export function AddCardModal({
               <p className="font-medium text-red-300">Could not load catalog</p>
               <p className="mt-1 text-sm text-slate-400">
                 {catalogError ??
-                  "Run card_catalog_master.sql in Supabase, then wait for the 6 AM catalog sync."}
+                  "Couldn't load the card catalog. Try again in a moment."}
               </p>
             </div>
           ) : (
@@ -376,7 +376,7 @@ export function AddCardModal({
                   <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
                     <p className="font-medium text-slate-300">No banks in catalog yet</p>
                     <p className="mt-1 text-sm text-slate-500">
-                      Run card_catalog_master.sql and the 6 AM sync, then reopen.
+                      The card catalog is updating. Try again shortly.
                     </p>
                   </div>
                 ) : (

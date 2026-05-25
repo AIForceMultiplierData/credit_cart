@@ -231,7 +231,7 @@ export default function AdminDashboardPage() {
             </p>
             {analytics?.source === "computed_fallback" ? (
               <p className="mt-1 text-xs text-amber-400/90">
-                Funnels computed from live tables — run analytics SQL for full semantic layer.
+                Funnels computed from live data — extended analytics views not enabled yet.
               </p>
             ) : analytics?.source === "analytics_views" ? (
               <p className="mt-1 text-xs text-emerald-400/80">

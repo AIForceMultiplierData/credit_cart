@@ -2,6 +2,8 @@
 import { BANK_REGISTRY } from "@/lib/bank-registry"
 import { resolveCardImageUrl } from "@/lib/card-photo-registry"
 
+// card_image_url in RAW is SVG art path; resolveCardImageUrl swaps in /images/cards photos when present.
+
 export type CatalogCard = {
   card_id: string
   bank_id: string
@@ -14,7 +16,7 @@ export type CatalogCard = {
 }
 
 const logo = (bankId: string) =>
-  BANK_REGISTRY.find((b) => b.bank_id === bankId)?.logo_url ?? "/banks/default.svg"
+  BANK_REGISTRY.find((b) => b.bank_id === bankId)?.logo_url ?? "clearbit.com"
 
 const RAW: Omit<CatalogCard, "bank_logo_url">[] = [
   {

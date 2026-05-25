@@ -21,30 +21,42 @@ export function WalletCardLendingToggle({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-2 rounded-xl border px-2.5 py-2 transition-colors",
+        "flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-colors",
         active
           ? "border-emerald-500/40 bg-emerald-500/10"
           : "border-red-500/30 bg-red-500/5"
       )}
     >
-      <div className="min-w-0">
-        <p
-          className={cn(
-            "text-[10px] font-bold uppercase tracking-wide",
-            active ? "text-emerald-300" : "text-red-400"
-          )}
-        >
-          {active ? "Earning on" : "Earning off"}
-        </p>
-        <p className="truncate text-[9px] text-slate-500">
-          {active ? "Visible to buyers" : "Not visible to buyers"}
-        </p>
-      </div>
+      <p
+        className={cn(
+          "min-w-0 flex-1 truncate text-[10px] font-bold leading-tight tracking-wide",
+          active ? "text-emerald-300" : "text-red-400"
+        )}
+      >
+        {active ? (
+          <>
+            <span className="uppercase">Earning on</span>
+            <span className="font-semibold normal-case text-slate-400">
+              {" "}
+              (Visible to buyers)
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="uppercase">Earning off</span>
+            <span className="font-semibold normal-case text-slate-500">
+              {" "}
+              (Not visible to buyers)
+            </span>
+          </>
+        )}
+      </p>
       <Switch
         checked={active}
         disabled={disabled}
         onCheckedChange={(checked) => onToggle(card.card_id, checked)}
         className={cn(
+          "shrink-0",
           "data-[state=checked]:bg-emerald-500",
           "data-[state=unchecked]:bg-red-500/70"
         )}

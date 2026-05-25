@@ -304,7 +304,7 @@ export async function loadAdminAnalytics(
   return {
     source: "computed_fallback",
     setup_hint:
-      "Run supabase/analytics_semantic_layer.sql in Supabase for full semantic-layer funnels.",
+      "Extended analytics views are not enabled yet.",
     user_funnel: {
       google_login_users: googleCount,
       users_with_card: usersWithCard,

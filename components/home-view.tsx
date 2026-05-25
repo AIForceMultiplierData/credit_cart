@@ -57,19 +57,21 @@ function StatTile({
     : value.toLocaleString("en-IN")
 
   return (
-    <div className="flex h-full min-h-[4.75rem] w-full flex-col items-center justify-center rounded-xl border border-slate-800/50 bg-slate-900/60 px-2 py-3 text-center backdrop-blur-md">
-      <Icon className={cn("mb-1 h-3.5 w-3.5 shrink-0", iconClassName)} />
+    <div className="flex h-full min-h-0 w-full flex-col items-center justify-center rounded-2xl border border-slate-800/50 bg-slate-900/60 px-3 py-4 text-center backdrop-blur-md">
+      <Icon className={cn("mb-2 h-5 w-5 shrink-0", iconClassName)} />
       {loading ? (
         <>
-          <Skeleton className="mb-1 h-4 w-8 bg-slate-800" />
-          <Skeleton className="h-2.5 w-12 bg-slate-800/80" />
+          <Skeleton className="mb-2 h-6 w-10 bg-slate-800" />
+          <Skeleton className="h-3 w-14 bg-slate-800/80" />
         </>
       ) : (
         <>
-          <p className="text-sm font-bold leading-none text-slate-50">
+          <p className="text-xl font-bold leading-none text-slate-50">
             {displayValue}
           </p>
-          <p className="mt-1 text-[10px] leading-none text-slate-500">{label}</p>
+          <p className="mt-2 text-xs font-medium leading-none text-slate-500">
+            {label}
+          </p>
         </>
       )}
     </div>
@@ -156,7 +158,7 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         onNeedSignIn={onSignIn}
       />
 
-      <div className="mb-6 grid w-full grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+      <div className="mb-6 grid h-52 w-full grid-cols-2 grid-rows-2 gap-3 sm:h-56">
         <StatTile
           icon={TrendingUp}
           iconClassName="text-emerald-400"
@@ -182,7 +184,7 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         <button
           type="button"
           onClick={() => onNavigate("wallet")}
-          className="flex h-full w-full min-w-0 text-left transition-opacity hover:opacity-90 active:scale-[0.98]"
+          className="flex h-full min-h-0 w-full min-w-0 text-left transition-opacity hover:opacity-90 active:scale-[0.98]"
           aria-label="Open wallet"
         >
           <StatTile

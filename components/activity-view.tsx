@@ -166,10 +166,14 @@ export function ActivityView() {
           err instanceof Error ? err.message : "Failed to load contracts."
         if (/does not exist|relation|permission denied|PGRST/i.test(message)) {
           setLoadHint(
-            "Activity needs Supabase setup. Run supabase/contracts.sql in the SQL Editor."
+            "Activity isn't available yet. Try again in a moment."
           )
         } else if (!options?.silent) {
-          setLoadHint(message)
+          setLoadHint(
+            /supabase|postgres|PGRST|\.sql/i.test(message)
+              ? "Couldn't load activity. Try again in a moment."
+              : message
+          )
         }
         setContracts([])
         setLiveUpdatesEnabled(false)

@@ -294,7 +294,7 @@ export function FulfillmentTrigger({
               Tracking Number
             </p>
             <p className="mt-1 font-mono text-sm font-bold text-blue-300">
-              {(trackingLog?.tracking_number ?? trackingNumber) || "Pending sync…"}
+              {(trackingLog?.tracking_number ?? trackingNumber) || "Tracking pending…"}
             </p>
           </div>
 

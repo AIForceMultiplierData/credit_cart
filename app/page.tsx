@@ -38,9 +38,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      {/* Mobile Constraint Container */}
-      <div className="max-w-md mx-auto min-h-screen relative border-x border-slate-800 overflow-x-hidden bg-slate-950">
+    <div className="min-h-screen w-full bg-slate-950">
+      <div className="relative mx-auto min-h-screen w-full min-w-0 overflow-x-hidden bg-slate-950 md:max-w-md md:border-x md:border-slate-800">
         {/* Status Bar Mockup */}
         <div className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
           <AppHeader

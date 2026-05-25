@@ -193,7 +193,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "Leads table not installed. Run supabase/credit_card_leads.sql in Supabase SQL Editor.",
+              "Lead capture isn't available yet. Try again later.",
           },
           { status: 503 }
         )

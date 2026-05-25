@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button"
 
 export type WalletCard = WalletCardRecord
 
-function getSupabaseErrorMessage(err: unknown, fallback: string): string {
+function getWalletErrorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === "object" && "message" in err) {
     const message = String((err as { message: string }).message)
     const code =
@@ -42,20 +42,12 @@ function getSupabaseErrorMessage(err: unknown, fallback: string): string {
     if (
       code === "PGRST202" ||
       message.includes("get_or_create_my_wallet") ||
-      message.includes("upsert_my_wallet")
+      message.includes("upsert_my_wallet") ||
+      message.includes("row-level security") ||
+      /does not exist|PGRST/i.test(message)
     ) {
-      return "Wallet RPC not installed. Run supabase/wallet_policies.sql in Supabase SQL Editor."
+      return fallback
     }
-
-    if (message.includes("row-level security")) {
-      return `${message} — run supabase/wallet_policies.sql in Supabase SQL Editor.`
-    }
-
-    const hint =
-      "hint" in err && (err as { hint?: string }).hint
-        ? ` (${(err as { hint: string }).hint})`
-        : ""
-    return `${message}${hint}`
   }
   return fallback
 }
@@ -86,17 +78,11 @@ export function WalletView() {
 
       setCards(enrichWalletCards(parseWalletCards(data ?? [])))
     } catch (err) {
-      const message = getSupabaseErrorMessage(
+      const message = getWalletErrorMessage(
         err,
-        "Failed to load wallet cards."
+        "Couldn't load your wallet. Try signing in again."
       )
-      if (/does not exist|row-level security|PGRST|get_or_create/i.test(message)) {
-        setLoadHint(
-          "Wallet needs Supabase setup. Run supabase/wallet_policies.sql in the SQL Editor."
-        )
-      } else {
-        setLoadHint(message)
-      }
+      setLoadHint(message)
       setCards([])
     } finally {
       setLoading(false)
@@ -136,7 +122,10 @@ export function WalletView() {
           "Your card is now in the circle arsenal.",
       })
     } catch (err) {
-      const message = getSupabaseErrorMessage(err, "Failed to update wallet.")
+      const message = getWalletErrorMessage(
+        err,
+        "Couldn't save your wallet. Try again."
+      )
       toast.error("Save failed", { description: message })
       throw err
     } finally {
@@ -289,8 +278,8 @@ export function WalletView() {
           <div>
             <p className="font-semibold text-slate-50">Circle Power</p>
             <p className="text-sm text-slate-400">
-              {lendingActiveCount} lending • {cards.length} cards • synced to
-              Supabase
+              {lendingActiveCount} earning • {cards.length} card
+              {cards.length === 1 ? "" : "s"} in your wallet
             </p>
           </div>
         </div>

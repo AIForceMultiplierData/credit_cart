@@ -61,10 +61,13 @@ function isPermissionError(message: string): boolean {
 
 function lenderFeedLoadHint(message: string): string {
   if (isSchemaMissingError(message)) {
-    return "Contracts table is missing or incomplete. Run supabase/contracts_schema_repair.sql then supabase/lender_feed_fix.sql in the SQL Editor."
+    return "Lending opportunities aren't available yet. Try again later."
   }
   if (isPermissionError(message)) {
-    return "Tables exist but access is blocked. Re-run supabase/lender_feed_fix.sql (full file), then refresh the page."
+    return "Couldn't load lending opportunities. Sign in and refresh the page."
+  }
+  if (/supabase|postgres|sql editor|\.sql/i.test(message)) {
+    return "Couldn't load lending opportunities. Try again later."
   }
   return message
 }

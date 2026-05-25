@@ -424,7 +424,7 @@ export type CatalogCard = {
 }
 
 const logo = (bankId: string) =>
-  BANK_REGISTRY.find((b) => b.bank_id === bankId)?.logo_url ?? "/banks/default.svg"
+  BANK_REGISTRY.find((b) => b.bank_id === bankId)?.logo_url ?? "clearbit.com"
 
 const RAW: Omit<CatalogCard, "bank_logo_url">[] = [
 ${cards
