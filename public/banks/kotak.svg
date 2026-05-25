@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img" aria-label="KOTAK">
-  <text x="60" y="28" text-anchor="middle" fill="#ED1C24" font-family="Arial,sans-serif" font-size="17" font-weight="700">KOTAK</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img"><path fill="none" stroke="#003874" stroke-width="4" d="M8 22c8-12 16-12 24 0s16 12 24 0"/><circle cx="20" cy="22" r="3" fill="#ED232A"/><text x="42" y="26" fill="#003874" font-family="Arial,sans-serif" font-size="12" font-weight="700">kotak</text></svg>

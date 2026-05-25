@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { BankLogo } from "@/components/bank-logo"
 import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
+import { getCardArtUrl } from "@/lib/card-art-registry"
 import { BANK_REGISTRY, resolveBankProfile } from "@/lib/bank-registry"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
@@ -22,6 +23,7 @@ export type CardCatalogRow = {
   bank_id: string | null
   bank_name: string
   bank_logo_url: string | null
+  card_image_url: string | null
   card_name: string
   style_classes: string
   network: string | null
@@ -35,6 +37,7 @@ export type WalletCardRecord = {
   bank_id?: string | null
   bank_name: string
   bank_logo_url?: string | null
+  card_image_url?: string | null
   card_name: string
   style_classes: string
   active_for_lending: boolean
@@ -65,11 +68,15 @@ type CardCatalogSelect = Partial<CardCatalogRow> & {
 function enrichCatalogRow(row: CardCatalogSelect): CardCatalogRow {
   const bank = resolveBankProfile(row.bank_name, row.bank_id)
 
+  const cardImage =
+    row.card_image_url ?? getCardArtUrl(row.card_id) ?? null
+
   return {
     card_id: row.card_id,
     bank_id: row.bank_id ?? bank.bank_id,
     bank_name: row.bank_name,
     bank_logo_url: row.bank_logo_url ?? bank.logo_url,
+    card_image_url: cardImage,
     card_name: row.card_name,
     style_classes: row.style_classes,
     network: row.network ?? null,
@@ -125,12 +132,14 @@ function CatalogCardPreview({
       )}
     >
       <CardCatalogThumbnail
+        cardId={card.card_id}
         bankName={card.bank_name}
         bankId={card.bank_id}
         bankLogoUrl={card.bank_logo_url}
+        cardImageUrl={card.card_image_url}
         cardName={card.card_name}
         styleClasses={card.style_classes}
-        className="w-full p-4 shadow-lg"
+        className="w-full shadow-lg"
         subtitle={
           <span className="font-mono tracking-widest opacity-60">
             •••• •••• •••• 4242
@@ -168,7 +177,7 @@ export function AddCardModal({
       setCatalogError(null)
 
       const masterSelect =
-        "card_id, bank_id, bank_name, bank_logo_url, card_name, style_classes, network, card_tier, apply_url, is_active"
+        "card_id, bank_id, bank_name, bank_logo_url, card_image_url, card_name, style_classes, network, card_tier, apply_url, is_active"
 
       try {
         let data: CardCatalogSelect[] | null = null
@@ -278,6 +287,7 @@ export function AddCardModal({
         bank_id: selectedCard.bank_id,
         bank_name: selectedCard.bank_name,
         bank_logo_url: selectedCard.bank_logo_url,
+        card_image_url: selectedCard.card_image_url,
         card_name: selectedCard.card_name,
         style_classes: selectedCard.style_classes,
         active_for_lending: false,
@@ -290,7 +300,7 @@ export function AddCardModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92vh] flex-col overflow-hidden border-slate-800 bg-slate-950/95 p-0 text-slate-50 backdrop-blur-xl sm:max-w-lg">
+      <DialogContent className="flex max-h-[92vh] flex-col overflow-hidden border-slate-800 bg-slate-950/95 p-0 text-slate-50 backdrop-blur-xl sm:max-w-xl">
         <div className="border-b border-slate-800/80 bg-slate-900/60 px-5 py-4 backdrop-blur-md">
           <DialogHeader className="space-y-1 text-left">
             <DialogTitle className="text-lg font-bold text-slate-50">
@@ -322,7 +332,7 @@ export function AddCardModal({
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:min-h-[420px]">
           {catalogLoading ? (
             <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-xl border border-slate-800/60 bg-slate-900/40 backdrop-blur-md">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />

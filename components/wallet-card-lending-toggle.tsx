@@ -1,7 +1,6 @@
 "use client"
 
-import { Cpu } from "lucide-react"
-import { BankLogo } from "@/components/bank-logo"
+import { CardVisual } from "@/components/card-visual"
 import type { WalletCardRecord } from "@/components/add-card-modal"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -67,34 +66,19 @@ type WalletCardTileProps = {
 export function WalletCardTile({ card, lendingToggle }: WalletCardTileProps) {
   return (
     <article className="space-y-2">
-      <div
-        className={cn(
-          "relative aspect-[1.58/1] overflow-hidden rounded-xl p-3 shadow-lg shadow-black/20",
-          "flex flex-col justify-between border border-white/10 transition-transform duration-300 hover:scale-[1.02]",
-          card.style_classes
-        )}
-      >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent" />
-        <div className="relative flex items-start justify-between">
-          <div className="flex h-6 w-8 items-center justify-center rounded bg-white/20 backdrop-blur-sm">
-            <Cpu className="h-3.5 w-3.5 opacity-90" aria-hidden />
-          </div>
-          <BankLogo
-            bankName={card.bank_name}
-            bankId={card.bank_id}
-            logoUrl={card.bank_logo_url}
-            className="h-4 max-w-[3.5rem]"
-            imageClassName="h-4 w-auto max-w-[3.5rem]"
-          />
-        </div>
-        <div className="relative">
-          <p className="text-xs font-bold leading-tight">{card.card_name}</p>
-          <p className="mt-0.5 font-mono text-[8px] tracking-wider opacity-60">
-            •••• 4242
-          </p>
-        </div>
+      <div className="relative transition-transform duration-300 hover:scale-[1.02]">
+        <CardVisual
+          cardId={card.card_id}
+          bankName={card.bank_name}
+          cardName={card.card_name}
+          styleClasses={card.style_classes}
+          bankId={card.bank_id}
+          bankLogoUrl={card.bank_logo_url}
+          cardImageUrl={card.card_image_url}
+          className="shadow-lg shadow-black/20"
+        />
         {card.active_for_lending ? (
-          <span className="absolute right-2 top-2 rounded-full bg-emerald-500/25 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wide text-emerald-200">
+          <span className="absolute right-2 top-2 z-10 rounded-full bg-emerald-500/25 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wide text-emerald-200">
             Live
           </span>
         ) : null}

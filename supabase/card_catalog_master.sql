@@ -28,7 +28,25 @@ insert into public.card_banks (bank_id, bank_name, logo_url, brand_color, style_
   ('axis', 'AXIS', '/banks/axis.svg', '#971237', 'bg-gradient-to-br from-purple-700 to-fuchsia-900 text-white', 40),
   ('kotak', 'KOTAK', '/banks/kotak.svg', '#ED1C24', 'bg-gradient-to-br from-red-700 to-red-950 text-red-100', 50),
   ('idfc', 'IDFC', '/banks/idfc.svg', '#9D2235', 'bg-gradient-to-br from-rose-800 to-slate-900 text-rose-100', 60),
-  ('indusind', 'INDUSIND', '/banks/indusind.svg', '#832729', 'bg-gradient-to-br from-amber-800 to-red-950 text-amber-100', 70)
+  ('indusind', 'INDUSIND', '/banks/indusind.svg', '#832729', 'bg-gradient-to-br from-amber-800 to-red-950 text-amber-100', 70),
+  ('pnb', 'PNB', '/banks/pnb.svg', '#7D1935', 'bg-gradient-to-br from-red-900 to-amber-950 text-amber-100', 80),
+  ('bob', 'BOB', '/banks/bob.svg', '#F57C00', 'bg-gradient-to-br from-orange-600 to-red-800 text-white', 90),
+  ('canara', 'CANARA', '/banks/canara.svg', '#0084C7', 'bg-gradient-to-br from-blue-600 to-yellow-700 text-white', 100),
+  ('union', 'UNION', '/banks/union.svg', '#D71920', 'bg-gradient-to-br from-red-600 to-blue-800 text-white', 110),
+  ('boi', 'BOI', '/banks/boi.svg', '#0054A6', 'bg-gradient-to-br from-blue-800 to-orange-700 text-white', 120),
+  ('iob', 'IOB', '/banks/iob.svg', '#0054A6', 'bg-gradient-to-br from-blue-700 to-orange-600 text-white', 130),
+  ('idbi', 'IDBI', '/banks/idbi.svg', '#008C3A', 'bg-gradient-to-br from-green-700 to-orange-800 text-white', 140),
+  ('yes', 'YES', '/banks/yes.svg', '#004A8F', 'bg-gradient-to-br from-blue-800 to-slate-900 text-blue-100', 150),
+  ('rbl', 'RBL', '/banks/rbl.svg', '#0054A6', 'bg-gradient-to-br from-blue-700 to-slate-900 text-white', 160),
+  ('hsbc', 'HSBC', '/banks/hsbc.svg', '#DB0011', 'bg-gradient-to-br from-red-700 to-slate-900 text-white', 170),
+  ('amex', 'AMEX', '/banks/amex.svg', '#006FCF', 'bg-gradient-to-br from-blue-700 to-slate-800 text-white', 180),
+  ('citi', 'CITI', '/banks/citi.svg', '#004B8D', 'bg-gradient-to-br from-blue-800 to-red-900 text-white', 190),
+  ('sc', 'SC', '/banks/sc.svg', '#00857F', 'bg-gradient-to-br from-teal-600 to-green-700 text-white', 200),
+  ('au', 'AU', '/banks/au.svg', '#6B21A8', 'bg-gradient-to-br from-purple-700 to-orange-600 text-white', 210),
+  ('central', 'CENTRAL', '/banks/central.svg', '#004B8D', 'bg-gradient-to-br from-blue-800 to-slate-900 text-white', 220),
+  ('uco', 'UCO', '/banks/uco.svg', '#0054A6', 'bg-gradient-to-br from-blue-700 to-slate-900 text-white', 230),
+  ('indian', 'INDIAN', '/banks/indian.svg', '#0054A6', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 240),
+  ('bom', 'BOM', '/banks/bom.svg', '#0054A6', 'bg-gradient-to-br from-blue-700 to-indigo-900 text-white', 250)
 on conflict (bank_id) do update set
   bank_name = excluded.bank_name,
   logo_url = excluded.logo_url,
@@ -43,6 +61,7 @@ alter table public.card_catalog
   add column if not exists card_slug text,
   add column if not exists bank_id text,
   add column if not exists bank_logo_url text,
+  add column if not exists card_image_url text,
   add column if not exists network text,
   add column if not exists card_tier text,
   add column if not exists apply_url text,
@@ -83,6 +102,29 @@ update public.card_catalog set card_slug = 'icici_amazon' where upper(bank_name)
 update public.card_catalog set card_slug = 'icici_sapphiro' where upper(bank_name) = 'ICICI' and card_name ilike '%sapphiro%';
 update public.card_catalog set card_slug = 'axis_flipkart' where upper(bank_name) = 'AXIS' and card_name ilike '%flipkart%';
 update public.card_catalog set card_slug = 'axis_magnus' where upper(bank_name) = 'AXIS' and card_name ilike '%magnus%';
+update public.card_catalog set card_slug = 'axis_vistara' where upper(bank_name) = 'AXIS' and card_name ilike '%vistara%';
+update public.card_catalog set card_slug = 'axis_airtel' where upper(bank_name) = 'AXIS' and card_name ilike '%airtel%';
+update public.card_catalog set card_slug = 'hdfc_swiggy' where upper(bank_name) = 'HDFC' and card_name ilike '%swiggy%';
+update public.card_catalog set card_slug = 'hdfc_tata_neu' where upper(bank_name) = 'HDFC' and card_name ilike '%neu%';
+update public.card_catalog set card_slug = 'hdfc_freedom' where upper(bank_name) = 'HDFC' and card_name ilike '%freedom%';
+update public.card_catalog set card_slug = 'sbi_elite' where upper(bank_name) = 'SBI' and card_name ilike '%elite%';
+
+-- Card face art (public/cards/*.svg)
+update public.card_catalog set card_image_url = '/cards/hdfc_millennia.svg' where card_slug = 'hdfc_millennia';
+update public.card_catalog set card_image_url = '/cards/hdfc_regalia.svg' where card_slug = 'hdfc_regalia';
+update public.card_catalog set card_image_url = '/cards/hdfc_diners.svg' where card_slug = 'hdfc_diners';
+update public.card_catalog set card_image_url = '/cards/hdfc_swiggy.svg' where card_slug = 'hdfc_swiggy';
+update public.card_catalog set card_image_url = '/cards/hdfc_tata_neu.svg' where card_slug = 'hdfc_tata_neu';
+update public.card_catalog set card_image_url = '/cards/hdfc_freedom.svg' where card_slug = 'hdfc_freedom';
+update public.card_catalog set card_image_url = '/cards/sbi_cashback.svg' where card_slug = 'sbi_cashback';
+update public.card_catalog set card_image_url = '/cards/sbi_simplyclick.svg' where card_slug = 'sbi_simplyclick';
+update public.card_catalog set card_image_url = '/cards/sbi_elite.svg' where card_slug = 'sbi_elite';
+update public.card_catalog set card_image_url = '/cards/icici_amazon.svg' where card_slug = 'icici_amazon';
+update public.card_catalog set card_image_url = '/cards/icici_sapphiro.svg' where card_slug = 'icici_sapphiro';
+update public.card_catalog set card_image_url = '/cards/axis_flipkart.svg' where card_slug = 'axis_flipkart';
+update public.card_catalog set card_image_url = '/cards/axis_magnus.svg' where card_slug = 'axis_magnus';
+update public.card_catalog set card_image_url = '/cards/axis_vistara.svg' where card_slug = 'axis_vistara';
+update public.card_catalog set card_image_url = '/cards/axis_airtel.svg' where card_slug = 'axis_airtel';
 
 create unique index if not exists card_catalog_card_slug_key
   on public.card_catalog (card_slug)
@@ -143,6 +185,7 @@ select
   c.bank_id,
   c.bank_name,
   coalesce(c.bank_logo_url, b.logo_url) as bank_logo_url,
+  c.card_image_url,
   c.card_name,
   c.style_classes,
   c.network,

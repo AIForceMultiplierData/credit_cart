@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img" aria-label="AXIS">
-  <text x="60" y="28" text-anchor="middle" fill="#971237" font-family="Arial,sans-serif" font-size="20" font-weight="700">AXIS</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img"><path fill="#971237" d="M10 30 L20 8 L30 30 Z"/><text x="38" y="18" fill="#971237" font-family="Arial,sans-serif" font-size="10" font-weight="700">AXIS</text><text x="38" y="28" fill="#971237" font-family="Arial,sans-serif" font-size="8" font-weight="600">BANK</text></svg>

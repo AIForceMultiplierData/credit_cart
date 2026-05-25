@@ -1,4 +1,5 @@
 import type { WalletCardRecord } from "@/components/add-card-modal"
+import { getCardArtUrl } from "@/lib/card-art-registry"
 import { getBankLogoUrl } from "@/lib/bank-registry"
 
 const LEGACY_BANK_STYLES: Record<string, string> = {
@@ -48,6 +49,10 @@ export function normalizeWalletCard(item: unknown): WalletCardRecord | null {
           typeof row.bank_logo_url === "string"
             ? row.bank_logo_url
             : getBankLogoUrl(row.bank_name),
+        card_image_url:
+          typeof row.card_image_url === "string"
+            ? row.card_image_url
+            : getCardArtUrl(row.card_id),
         card_name: row.card_name,
         style_classes:
           typeof row.style_classes === "string"
@@ -107,6 +112,7 @@ export function serializeWalletCards(cards: WalletCardRecord[]): WalletCardRecor
     bank_id: card.bank_id ?? null,
     bank_name: card.bank_name,
     bank_logo_url: card.bank_logo_url ?? null,
+    card_image_url: card.card_image_url ?? getCardArtUrl(card.card_id),
     card_name: card.card_name,
     style_classes: card.style_classes,
     active_for_lending: Boolean(card.active_for_lending),

@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img" aria-label="ICICI">
-  <text x="60" y="28" text-anchor="middle" fill="#F37021" font-family="Arial,sans-serif" font-size="18" font-weight="700">ICICI</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img"><ellipse cx="22" cy="20" rx="16" ry="14" fill="#F37021"/><text x="22" y="26" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="18" font-weight="700" font-style="italic">i</text><text x="44" y="26" fill="#F37021" font-family="Arial,sans-serif" font-size="13" font-weight="700" font-style="italic">ICICI Bank</text></svg>

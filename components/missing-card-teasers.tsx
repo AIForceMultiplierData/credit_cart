@@ -65,11 +65,12 @@ export function MissingCardTeasers({
           <article key={teaser.card_id} className="w-[108px] shrink-0">
             <div className="relative">
               <CardCatalogThumbnail
+                cardId={teaser.card_id}
                 bankName={teaser.bank_name}
                 bankLogoUrl={teaser.bank_logo_url}
                 cardName={teaser.card_name}
                 styleClasses={teaser.style_classes}
-                className="rounded-lg p-2"
+                className="rounded-lg"
                 subtitle={
                   <span className="font-semibold text-emerald-300/95">
                     Save {formatSavings(teaser, estimatedPrice)}

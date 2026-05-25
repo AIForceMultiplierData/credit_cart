@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import * as cheerio from "cheerio"
-import { resolveBankProfile } from "@/lib/bank-registry"
+import { BANK_REGISTRY, resolveBankProfile } from "@/lib/bank-registry"
+import { getCardArtUrl } from "@/lib/card-art-registry"
 import { call_ai } from "@/lib/llm-router"
 
 const CARD_EXTRACTION_PROMPT =
@@ -26,6 +27,7 @@ type CardCatalogRow = {
   bank_id: string
   bank_name: string
   bank_logo_url: string
+  card_image_url?: string | null
   card_name: string
   style_classes: string
   network?: string | null
@@ -227,7 +229,13 @@ async function upsertBanksFromCards(
   cards: Array<{ bank_name: string }>
 ): Promise<string[]> {
   const errors: string[] = []
-  const uniqueBanks = new Map<string, ReturnType<typeof resolveBankProfile>>()
+  const uniqueBanks = new Map<string, (typeof BANK_REGISTRY)[number]>()
+
+  for (const bank of BANK_REGISTRY) {
+    if (bank.bank_id !== "default") {
+      uniqueBanks.set(bank.bank_id, bank)
+    }
+  }
 
   for (const card of cards) {
     const bankName = normalizeBankName(card.bank_name)
@@ -324,6 +332,7 @@ async function upsertCardsToCatalog(
       bank_id: card.bank_id,
       bank_name: card.bank_name,
       bank_logo_url: card.bank_logo_url,
+      card_image_url: getCardArtUrl(cardId),
       card_name: card.card_name,
       style_classes: card.style_classes,
       network: card.network,

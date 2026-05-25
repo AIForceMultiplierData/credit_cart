@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 240" role="img">
+  <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1f2937"/><stop offset="100%" stop-color="#c2410c"/></linearGradient></defs>
+  <rect width="380" height="240" rx="16" fill="url(#g)"/>
+  <text x="260" y="110" fill="#fff" opacity="0.2" font-size="48" font-weight="700">a</text>
+  <rect x="28" y="52" width="44" height="34" rx="6" fill="#D4AF37" opacity="0.9"/>
+  <text x="50" y="74" text-anchor="middle" fill="#1a1a1a" font-size="8" font-weight="700">CHIP</text>
+  <text x="28" y="200" fill="#fff" font-family="Arial,sans-serif" font-size="22" font-weight="700">Amazon Pay</text>
+  <text x="28" y="220" fill="#fff" opacity="0.75" font-family="Arial,sans-serif" font-size="12">ICICI Bank</text>
+  <text x="320" y="210" fill="#fff" opacity="0.5" font-family="Arial,sans-serif" font-size="14" font-weight="700">VISA</text>
+</svg>

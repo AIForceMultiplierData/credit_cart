@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img" aria-label="HDFC">
-  <text x="60" y="28" text-anchor="middle" fill="#004C8F" font-family="Arial,sans-serif" font-size="20" font-weight="700">HDFC</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" role="img"><path fill="#004C8F" d="M8 6h18v28H8z"/><path fill="#ED232A" d="M8 6h10v10H8z"/><text x="34" y="27" fill="#004C8F" font-family="Arial,sans-serif" font-size="14" font-weight="700">HDFC Bank</text></svg>

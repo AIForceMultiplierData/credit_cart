@@ -238,6 +238,7 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
                   </div>
                 </div>
                 <CardCatalogThumbnail
+                  cardId={deal.cardId}
                   bankName={deal.cardBankName}
                   bankLogoUrl={deal.bankLogoUrl}
                   cardName={deal.cardName}
