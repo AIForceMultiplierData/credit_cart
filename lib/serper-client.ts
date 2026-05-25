@@ -123,8 +123,13 @@ function extractAmazonAsin(url: string): string | null {
 function buildProductQuery(
   url: string,
   platform: string,
-  category: string
+  category: string,
+  serperQuery?: string
 ): string {
+  if (serperQuery?.trim()) {
+    return serperQuery.trim()
+  }
+
   const asin = extractAmazonAsin(url)
 
   if (asin && /amazon/i.test(platform)) {
@@ -190,6 +195,7 @@ export async function fetchSerperDealContext(input: {
   walletCards: Array<{ bank_name: string; card_name: string }>
   existingTitle?: string
   existingPrice?: number | null
+  serperQuery?: string
 }): Promise<SerperDealContext> {
   const empty: SerperDealContext = {
     used_serper: false,
@@ -207,7 +213,8 @@ export async function fetchSerperDealContext(input: {
   const productQuery = buildProductQuery(
     input.url,
     input.platform,
-    input.category
+    input.category,
+    input.serperQuery
   )
   const offersQuery = buildCardOffersQuery(
     input.platform,

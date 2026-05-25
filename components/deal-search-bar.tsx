@@ -22,11 +22,16 @@ import {
 import { useAuth } from "@/hooks/useAuth"
 import { useDealSearchCards } from "@/hooks/useDealSearchCards"
 import type { DealSearchCategory, DealSearchResult } from "@/lib/deal-search"
+import {
+  defaultFlightSearchParams,
+  validateFlightSearch,
+  type FlightSearchParams,
+} from "@/lib/flight-search"
 import { DealOfferDetail } from "@/components/deal-offer-detail"
+import { FlightSearchForm } from "@/components/flight-search-form"
 import { formatInr } from "@/lib/deal-offer-breakdown"
 import { MissingCardTeasers } from "@/components/missing-card-teasers"
 import { cn } from "@/lib/utils"
-
 type DealSearchBarProps = {
   onNeedWallet?: () => void
   onNeedSignIn?: () => void
@@ -67,6 +72,9 @@ export function DealSearchBar({
     useDealSearchCards(user?.id)
   const [category, setCategory] = useState<DealSearchCategory>("product")
   const [url, setUrl] = useState("")
+  const [flightSearch, setFlightSearch] = useState<FlightSearchParams>(
+    defaultFlightSearchParams
+  )
   const [searching, setSearching] = useState(false)
   const [result, setResult] = useState<DealSearchResult | null>(null)
 
@@ -96,7 +104,13 @@ export function DealSearchBar({
     }
 
     const trimmedUrl = url.trim()
-    if (!trimmedUrl) {
+    if (category === "flight") {
+      const valid = validateFlightSearch(flightSearch)
+      if (!valid.ok) {
+        toast.error("Complete flight details", { description: valid.message })
+        return
+      }
+    } else if (!trimmedUrl) {
       toast.error("URL required", {
         description: "Paste the product or booking link you want to optimize.",
       })
@@ -112,8 +126,9 @@ export function DealSearchBar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category,
-          url: trimmedUrl,
+          url: category === "flight" ? "" : trimmedUrl,
           searchCards,
+          ...(category === "flight" ? { flightSearch } : {}),
         }),
       })
 
@@ -148,9 +163,9 @@ export function DealSearchBar({
           </p>
         </div>
         <p className="mb-4 text-xs leading-relaxed text-slate-400">
-          Pick a category, paste any booking or product URL — we rank wallet +
-          circle cards with exact ₹ off, pay amount, T&amp;C, and 50/50 split
-          when pooling.
+          {category === "flight"
+            ? "Enter route, dates, and total fare (₹) from your OTA — we rank wallet + circle cards with exact ₹ off before you book."
+            : "Pick a category, paste any booking or product URL — we rank wallet + circle cards with exact ₹ off, pay amount, T&C, and 50/50 split when pooling."}
         </p>
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -187,19 +202,30 @@ export function DealSearchBar({
             </SelectContent>
           </Select>
 
-          <Input
-            type="url"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder={selectedCategory.placeholder}
-            className="h-11 flex-1 border-slate-700 bg-slate-950 text-slate-50 placeholder:text-slate-500"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                void handleSearch()
-              }
-            }}
-          />
+          {category !== "flight" ? (
+            <Input
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder={selectedCategory.placeholder}
+              className="h-11 flex-1 border-slate-700 bg-slate-950 text-slate-50 placeholder:text-slate-500"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  void handleSearch()
+                }
+              }}
+            />
+          ) : null}
         </div>
+
+        {category === "flight" ? (
+          <div className="mt-3">
+            <FlightSearchForm
+              value={flightSearch}
+              onChange={setFlightSearch}
+            />
+          </div>
+        ) : null}
 
         <Button
           type="button"

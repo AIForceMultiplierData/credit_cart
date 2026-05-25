@@ -19,6 +19,13 @@ import {
 import { buildMissingCardTeasers } from "@/lib/deal-search-missing-cards"
 import { enrichDealSearchResult } from "@/lib/deal-offer-breakdown"
 import {
+  buildFlightProductTitle,
+  buildFlightReferenceUrl,
+  buildFlightSerperQuery,
+  parseFlightSearchBody,
+  validateFlightSearch,
+} from "@/lib/flight-search"
+import {
   fetchSerperDealContext,
   type SerperDealContext,
 } from "@/lib/serper-client"
@@ -28,6 +35,13 @@ type SearchRequestBody = {
   url?: string
   searchCards?: SearchCardInput[]
   walletCards?: WalletCardInput[]
+  flightSearch?: unknown
+}
+
+export type DealSearchOverrides = {
+  productTitle?: string
+  estimatedPrice?: number | null
+  serperQuery?: string
 }
 
 type UrlHints = {
@@ -345,10 +359,17 @@ function finalizeSearchResult(
   return enrichDealSearchResult(result, url)
 }
 
+export type DealSearchOverrides = {
+  productTitle?: string
+  estimatedPrice?: number | null
+  serperQuery?: string
+}
+
 export async function searchDealsForWallet(
   category: DealSearchCategory,
   url: string,
-  searchCards: SearchCardInput[]
+  searchCards: SearchCardInput[],
+  overrides?: DealSearchOverrides
 ): Promise<DealSearchResult> {
   const platform = detectPlatform(url)
   const hints = await fetchUrlHints(url)
@@ -358,13 +379,14 @@ export async function searchDealsForWallet(
     platform,
     category,
     walletCards: searchCards,
-    existingTitle: hints.title,
-    existingPrice: hints.price ?? null,
+    existingTitle: overrides?.productTitle ?? hints.title,
+    existingPrice: overrides?.estimatedPrice ?? hints.price ?? null,
+    serperQuery: overrides?.serperQuery,
   })
 
   const enrichedHints: UrlHints = {
-    title: hints.title || serper.product_title,
-    price: hints.price ?? serper.price ?? null,
+    title: overrides?.productTitle ?? hints.title ?? serper.product_title,
+    price: overrides?.estimatedPrice ?? hints.price ?? serper.price ?? null,
   }
 
   try {
@@ -436,16 +458,42 @@ export function parseSearchRequestBody(body: SearchRequestBody): {
   category: DealSearchCategory
   url: string
   searchCards: SearchCardInput[]
+  overrides?: DealSearchOverrides
 } | { error: string } {
   const category = normalizeCategory(String(body.category ?? ""))
-  const url = String(body.url ?? "").trim()
 
   if (!category) {
     return { error: "Select a category: flight, hotels, or product." }
   }
 
+  let url = String(body.url ?? "").trim()
+  let overrides: DealSearchOverrides | undefined
+
+  if (category === "flight") {
+    if (!body.flightSearch) {
+      return {
+        error:
+          "Complete flight route, dates, and total fare (₹) — required for card ranking.",
+      }
+    }
+    const flight = parseFlightSearchBody(body.flightSearch)
+    if (!flight) {
+      return { error: "Invalid flight search details." }
+    }
+    const valid = validateFlightSearch(flight)
+    if (!valid.ok) {
+      return { error: valid.message }
+    }
+    url = buildFlightReferenceUrl(flight)
+    overrides = {
+      productTitle: buildFlightProductTitle(flight),
+      estimatedPrice: flight.estimatedFare,
+      serperQuery: buildFlightSerperQuery(flight),
+    }
+  }
+
   if (!url) {
-    return { error: "Paste a product or booking URL." }
+    return { error: "Paste a product or booking URL, or complete flight details." }
   }
 
   if (!isValidHttpUrl(url)) {
@@ -476,5 +524,5 @@ export function parseSearchRequestBody(body: SearchRequestBody): {
     return { error: "Add at least one card to your wallet first." }
   }
 
-  return { category, url, searchCards }
+  return { category, url, searchCards, overrides }
 }
