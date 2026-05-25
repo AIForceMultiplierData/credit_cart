@@ -1,3 +1,5 @@
+import { FALLBACK_AIRPORT_OPTIONS } from "@/lib/indian-airports"
+
 export type FlightTripType = "oneway" | "return"
 
 export type FlightTimeSlot =
@@ -80,18 +82,12 @@ export const FLIGHT_AIRLINE_OPTIONS = [
   { id: "vistara", label: "Vistara", from: 9200 },
 ]
 
-export const INDIAN_AIRPORTS = [
-  { code: "DEL", city: "New Delhi", label: "Delhi (DEL)" },
-  { code: "BOM", city: "Mumbai", label: "Mumbai (BOM)" },
-  { code: "BLR", city: "Bengaluru", label: "Bengaluru (BLR)" },
-  { code: "HYD", city: "Hyderabad", label: "Hyderabad (HYD)" },
-  { code: "MAA", city: "Chennai", label: "Chennai (MAA)" },
-  { code: "CCU", city: "Kolkata", label: "Kolkata (CCU)" },
-  { code: "GOI", city: "Goa", label: "Goa (GOI)" },
-  { code: "PNQ", city: "Pune", label: "Pune (PNQ)" },
-  { code: "AMD", city: "Ahmedabad", label: "Ahmedabad (AMD)" },
-  { code: "COK", city: "Kochi", label: "Kochi (COK)" },
-]
+/** Legacy export — prefer Supabase `indian_airports` via useIndianAirports */
+export const INDIAN_AIRPORTS = FALLBACK_AIRPORT_OPTIONS.map((a) => ({
+  code: a.code,
+  city: a.city,
+  label: a.label,
+}))
 
 export function defaultFlightSearchParams(): FlightSearchParams {
   const tomorrow = new Date()

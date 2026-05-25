@@ -21,7 +21,17 @@ This will:
 - Backfill banks/logos/apply URLs using **bank_name + card_name** (not uuid)
 - Create `card_catalog_master` view
 
-### 2. Analytics layer
+### 2. Indian airports (flight FROM/TO)
+
+Run:
+
+`supabase/indian_airports.sql`
+
+Regenerate from app seed after edits:
+
+`node --experimental-strip-types scripts/generate-indian-airports-sql.mjs`
+
+### 3. Analytics layer
 
 After step 1 succeeds, run:
 
@@ -32,7 +42,7 @@ If you still see `column t.id does not exist` on transactions, either:
 - Re-run the updated analytics script (it auto-detects `id` vs `transaction_id`), or
 - Run `supabase/transactions_schema_repair.sql` then analytics again.
 
-### 3. Verify
+### 4. Verify
 
 ```sql
 select * from public.card_banks limit 5;

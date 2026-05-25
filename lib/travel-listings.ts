@@ -144,7 +144,8 @@ export function generateHotelListings(params: HotelSearchParams): TravelListing[
     )
   )
   const seed = hashSeed([
-    params.cityCode,
+    params.placeId ?? params.cityCode,
+    params.destination || params.city,
     params.checkIn,
     params.checkOut,
     String(params.rooms),
@@ -156,10 +157,10 @@ export function generateHotelListings(params: HotelSearchParams): TravelListing[
     const price = Math.round(perNight * nights * params.rooms * (guests > 2 ? 1.08 : 1))
     const refundable = i % 4 !== 3
     return {
-      id: `htl-${params.cityCode}-${i}`,
+      id: `htl-${params.placeId ?? params.cityCode}-${i}`,
       category: "hotels" as const,
       provider: tpl.chain,
-      title: `${tpl.chain} · ${params.city}`,
+      title: `${tpl.chain} · ${params.destination || params.city}`,
       subtitle: `${tpl.area} · ${tpl.stars}★ · ${nights} night${nights === 1 ? "" : "s"}`,
       price,
       meta: [

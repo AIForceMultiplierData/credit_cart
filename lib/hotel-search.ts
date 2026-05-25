@@ -13,6 +13,13 @@ export type HotelFilters = {
 }
 
 export type HotelSearchParams = {
+  /** Display label (city, landmark, etc.) */
+  destination: string
+  placeId: string | null
+  lat: number | null
+  lng: number | null
+  destinationConfirmed: boolean
+  /** @deprecated Legacy field — mirrors destination for listings */
   city: string
   cityCode: string
   checkIn: string
@@ -60,8 +67,13 @@ export function defaultHotelSearchParams(): HotelSearchParams {
   checkOut.setDate(checkOut.getDate() + 2)
 
   return {
-    city: "Goa",
-    cityCode: "GOI",
+    destination: "",
+    placeId: null,
+    lat: null,
+    lng: null,
+    destinationConfirmed: false,
+    city: "",
+    cityCode: "",
     checkIn: checkIn.toISOString().slice(0, 10),
     checkOut: checkOut.toISOString().slice(0, 10),
     rooms: 1,
@@ -102,7 +114,7 @@ export function buildHotelProductTitle(params: HotelSearchParams): string {
 
 export function buildHotelSerperQuery(params: HotelSearchParams): string {
   return [
-    `hotels ${params.city} India`,
+    `hotels ${params.destination || params.city} India`,
     params.checkIn,
     params.checkOut,
     `${params.rooms} room`,
@@ -113,7 +125,7 @@ export function buildHotelSerperQuery(params: HotelSearchParams): string {
 export function buildHotelReferenceUrl(params: HotelSearchParams): string {
   const q = [
     "Hotels",
-    params.city,
+    params.destination || params.city,
     params.checkIn.replace(/-/g, ""),
     params.checkOut.replace(/-/g, ""),
   ]
@@ -124,8 +136,11 @@ export function validateHotelSearch(
   params: HotelSearchParams,
   options?: { requirePrice?: boolean }
 ): { ok: true } | { ok: false; message: string } {
-  if (!params.cityCode.trim()) {
-    return { ok: false, message: "Select a destination city." }
+  if (!params.destinationConfirmed || !params.placeId?.trim()) {
+    return {
+      ok: false,
+      message: "Search and confirm your hotel destination on the map.",
+    }
   }
   if (!params.checkIn) {
     return { ok: false, message: "Select check-in date." }
@@ -172,9 +187,22 @@ export function parseHotelSearchBody(raw: unknown): HotelSearchParams | null {
   const total = Number(b.estimatedTotal)
   const maxPrice = Number(filtersRaw.maxPrice)
 
+  const destination = String(b.destination ?? b.city ?? "")
+  const placeId =
+    typeof b.placeId === "string" && b.placeId.trim()
+      ? b.placeId.trim()
+      : null
+  const lat = Number(b.lat)
+  const lng = Number(b.lng)
+
   return {
-    city: String(b.city ?? ""),
-    cityCode: String(b.cityCode ?? "").toUpperCase(),
+    destination,
+    placeId,
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null,
+    destinationConfirmed: b.destinationConfirmed === true,
+    city: String(b.city ?? destination),
+    cityCode: String(b.cityCode ?? placeId?.slice(0, 8) ?? "").toUpperCase(),
     checkIn: String(b.checkIn ?? ""),
     checkOut: String(b.checkOut ?? ""),
     rooms: Math.max(1, Number(b.rooms) || 1),

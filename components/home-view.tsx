@@ -37,59 +37,39 @@ function formatSaved(amount: number): string {
   return `₹${amount.toLocaleString("en-IN")}`
 }
 
-function StatCard({
+function StatTile({
   icon: Icon,
   iconClassName,
   loading,
   value,
   label,
+  formatValue,
 }: {
   icon: typeof TrendingUp
   iconClassName: string
   loading: boolean
   value: number
   label: string
+  formatValue?: (n: number) => string
 }) {
-  const displayValue =
-    label === "Saved" ? formatSaved(value) : value.toLocaleString("en-IN")
+  const displayValue = formatValue
+    ? formatValue(value)
+    : value.toLocaleString("en-IN")
 
   return (
-    <div className="flex aspect-square flex-col items-center justify-center rounded-2xl border border-slate-800/50 bg-slate-900/60 p-3 text-center backdrop-blur-md">
-      <Icon className={cn("mb-2 h-5 w-5", iconClassName)} />
+    <div className="flex h-[4.5rem] w-full flex-col items-center justify-center rounded-xl border border-slate-800/50 bg-slate-900/60 px-2 py-2.5 text-center backdrop-blur-md">
+      <Icon className={cn("mb-1 h-3.5 w-3.5 shrink-0", iconClassName)} />
       {loading ? (
         <>
-          <Skeleton className="mb-2 h-7 w-10 bg-slate-800" />
-          <Skeleton className="h-3 w-12 bg-slate-800/80" />
+          <Skeleton className="mb-1 h-4 w-8 bg-slate-800" />
+          <Skeleton className="h-2.5 w-12 bg-slate-800/80" />
         </>
       ) : (
         <>
-          <p className="text-lg font-bold text-slate-50">{displayValue}</p>
-          <p className="text-xs text-slate-500">{label}</p>
-        </>
-      )}
-    </div>
-  )
-}
-
-function WalletStatCard({
-  loading,
-  cardCount,
-}: {
-  loading: boolean
-  cardCount: number
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-slate-800/50 bg-slate-900/60 px-2 py-2.5 text-center backdrop-blur-md">
-      <CreditCard className="mb-1 h-3.5 w-3.5 text-blue-400" />
-      {loading ? (
-        <>
-          <Skeleton className="mb-1 h-4 w-6 bg-slate-800" />
-          <Skeleton className="h-2.5 w-14 bg-slate-800/80" />
-        </>
-      ) : (
-        <>
-          <p className="text-sm font-bold leading-none text-slate-50">{cardCount}</p>
-          <p className="mt-1 text-[10px] leading-none text-slate-500">Wallet</p>
+          <p className="text-sm font-bold leading-none text-slate-50">
+            {displayValue}
+          </p>
+          <p className="mt-1 text-[10px] leading-none text-slate-500">{label}</p>
         </>
       )}
     </div>
@@ -177,21 +157,22 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
       />
 
       <div className="mx-auto mb-6 grid w-full max-w-[70%] grid-cols-2 gap-1.5">
-        <StatCard
+        <StatTile
           icon={TrendingUp}
           iconClassName="text-emerald-400"
           loading={statsLoading}
           value={stats.total_saved}
           label="Saved"
+          formatValue={formatSaved}
         />
-        <StatCard
+        <StatTile
           icon={Users}
           iconClassName="text-blue-400"
           loading={statsLoading}
           value={circleMembers}
           label="Circle"
         />
-        <StatCard
+        <StatTile
           icon={Zap}
           iconClassName="text-purple-400"
           loading={statsLoading}
@@ -201,10 +182,16 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         <button
           type="button"
           onClick={() => onNavigate("wallet")}
-          className="text-left transition-opacity hover:opacity-90 active:scale-[0.98]"
+          className="block w-full text-left transition-opacity hover:opacity-90 active:scale-[0.98]"
           aria-label="Open wallet"
         >
-          <WalletStatCard loading={statsLoading} cardCount={cardCount} />
+          <StatTile
+            icon={CreditCard}
+            iconClassName="text-blue-400"
+            loading={statsLoading}
+            value={cardCount}
+            label="Wallet"
+          />
         </button>
       </div>
     </div>

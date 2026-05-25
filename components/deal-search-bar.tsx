@@ -228,7 +228,7 @@ export function DealSearchBar({
 
   return (
     <div className="mb-6 space-y-4">
-      <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-slate-900/80 to-blue-500/10 p-4 backdrop-blur-md">
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-slate-900/80 to-blue-500/10 p-4 backdrop-blur-md">
         <Tooltip open={helpOpen} onOpenChange={setHelpOpen}>
           <TooltipTrigger asChild>
             <button
@@ -305,7 +305,7 @@ export function DealSearchBar({
         </div>
 
         {category === "flight" ? (
-          <div className="mt-3">
+          <div className="mt-3 min-w-0 overflow-hidden">
             <FlightSearchForm
               value={flightSearch}
               onChange={setFlightSearch}
@@ -314,7 +314,7 @@ export function DealSearchBar({
         ) : null}
 
         {category === "hotels" ? (
-          <div className="mt-3">
+          <div className="mt-3 min-w-0 overflow-hidden">
             <HotelSearchForm value={hotelSearch} onChange={setHotelSearch} />
           </div>
         ) : null}

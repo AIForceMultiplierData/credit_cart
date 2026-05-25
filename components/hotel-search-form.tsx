@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react"
 import { CalendarDays, ChevronDown, Minus, Plus, SlidersHorizontal } from "lucide-react"
 import { format } from "date-fns"
+import { HotelDestinationSearch } from "@/components/hotel-destination-search"
+import { MinimizableFilterTray } from "@/components/minimizable-filter-tray"
 import { Calendar } from "@/components/ui/calendar"
 import {
   Popover,
@@ -33,9 +35,9 @@ import {
   guestSummary,
   HOTEL_CHAIN_OPTIONS,
   HOTEL_SORT_OPTIONS,
-  INDIAN_HOTEL_CITIES,
   type HotelSearchParams,
 } from "@/lib/hotel-search"
+import { useMinimizableTray } from "@/hooks/useMinimizableTray"
 import { cn } from "@/lib/utils"
 
 type HotelSearchFormProps = {
@@ -43,85 +45,17 @@ type HotelSearchFormProps = {
   onChange?: (params: HotelSearchParams) => void
 }
 
-function CityField({
-  code,
-  city,
-  onSelect,
-}: {
-  code: string
-  city: string
-  onSelect: (code: string, city: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
-
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return INDIAN_HOTEL_CITIES
-    return INDIAN_HOTEL_CITIES.filter(
-      (c) =>
-        c.code.toLowerCase().includes(q) ||
-        c.city.toLowerCase().includes(q) ||
-        c.label.toLowerCase().includes(q)
-    )
-  }, [query])
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-full justify-between border-slate-700 bg-slate-950 text-left font-normal text-slate-100"
-        >
-          <span className="truncate">
-            <span className="font-semibold">{city}</span>
-            <span className="ml-2 text-slate-400">{code}</span>
-          </span>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] border-slate-800 bg-slate-900 p-2"
-        align="start"
-      >
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search city…"
-          className="mb-2 h-9 border-slate-700 bg-slate-950"
-        />
-        <div className="max-h-48 overflow-y-auto">
-          {matches.map((row) => (
-            <button
-              key={row.code}
-              type="button"
-              className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-800"
-              onClick={() => {
-                onSelect(row.code, row.city)
-                setOpen(false)
-                setQuery("")
-              }}
-            >
-              <span className="font-medium text-slate-100">{row.city}</span>
-              <span className="text-slate-500">{row.code}</span>
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 function DateField({
   label,
   value,
   onChange,
+  onAfterSelect,
   minDate,
 }: {
   label: string
   value: string
   onChange: (iso: string) => void
+  onAfterSelect?: () => void
   minDate?: Date
 }) {
   const selected = value ? new Date(`${value}T12:00:00`) : undefined
@@ -138,8 +72,10 @@ function DateField({
             variant="outline"
             className="h-11 w-full justify-start border-slate-700 bg-slate-950 text-slate-100"
           >
-            <CalendarDays className="mr-2 h-4 w-4 text-emerald-400" />
-            {value ? formatHotelDate(value) : "Select date"}
+            <CalendarDays className="mr-2 h-4 w-4 shrink-0 text-emerald-400" />
+            <span className="truncate">
+              {value ? formatHotelDate(value) : "Select date"}
+            </span>
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -150,7 +86,10 @@ function DateField({
             mode="single"
             selected={selected}
             onSelect={(day) => {
-              if (day) onChange(format(day, "yyyy-MM-dd"))
+              if (day) {
+                onChange(format(day, "yyyy-MM-dd"))
+                onAfterSelect?.()
+              }
             }}
             disabled={minDate ? { before: minDate } : undefined}
           />
@@ -166,12 +105,14 @@ function Counter({
   value,
   min,
   onChange,
+  onAfterChange,
 }: {
   label: string
   hint: string
   value: number
   min: number
   onChange: (n: number) => void
+  onAfterChange?: () => void
 }) {
   return (
     <div className="flex items-center justify-between py-2">
@@ -186,7 +127,10 @@ function Counter({
           variant="outline"
           className="h-8 w-8 rounded-full border-slate-600"
           disabled={value <= min}
-          onClick={() => onChange(value - 1)}
+          onClick={() => {
+            onChange(value - 1)
+            onAfterChange?.()
+          }}
         >
           <Minus className="h-3 w-3" />
         </Button>
@@ -196,7 +140,10 @@ function Counter({
           size="icon"
           variant="outline"
           className="h-8 w-8 rounded-full border-slate-600"
-          onClick={() => onChange(value + 1)}
+          onClick={() => {
+            onChange(value + 1)
+            onAfterChange?.()
+          }}
         >
           <Plus className="h-3 w-3" />
         </Button>
@@ -210,6 +157,9 @@ export function HotelSearchForm({ value, onChange }: HotelSearchFormProps) {
     value ?? defaultHotelSearchParams()
   )
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const destinationTray = useMinimizableTray("hotel-destination")
+  const datesTray = useMinimizableTray("hotel-dates")
+  const guestsTray = useMinimizableTray("hotel-guests")
 
   function patch(partial: Partial<HotelSearchParams>) {
     const next = { ...params, ...partial }
@@ -227,64 +177,111 @@ export function HotelSearchForm({ value, onChange }: HotelSearchFormProps) {
     ? new Date(`${params.checkIn}T12:00:00`)
     : today
 
+  const destinationSummary = params.destinationConfirmed
+    ? params.destination
+    : "Search city, landmark…"
+  const datesSummary = `${formatHotelDate(params.checkIn)} – ${formatHotelDate(params.checkOut)}`
+  const guestsSummaryText = guestSummary(params.guests, params.rooms)
+
   return (
-    <div className="space-y-3">
-      <div>
-        <Label className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
-          Destination
-        </Label>
-        <CityField
-          code={params.cityCode}
-          city={params.city}
-          onSelect={(cityCode, city) => patch({ cityCode, city })}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <DateField
-          label="Check-in"
-          value={params.checkIn}
-          onChange={(checkIn) => patch({ checkIn })}
-          minDate={today}
-        />
-        <DateField
-          label="Check-out"
-          value={params.checkOut}
-          onChange={(checkOut) => patch({ checkOut })}
-          minDate={checkOutMin}
-        />
-      </div>
-
-      <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 p-3">
-        <Counter
-          label="Rooms"
-          hint="Number of rooms"
-          value={params.rooms}
-          min={1}
-          onChange={(rooms) => patch({ rooms })}
-        />
-        <Counter
-          label="Adults"
-          hint="12+ years"
-          value={params.guests.adults}
-          min={1}
-          onChange={(adults) =>
-            patch({ guests: { ...params.guests, adults } })
+    <div className="min-w-0 space-y-2">
+      <MinimizableFilterTray
+        label="Destination"
+        summary={destinationSummary}
+        open={destinationTray.open}
+        onOpenChange={destinationTray.setOpen}
+      >
+        <HotelDestinationSearch
+          value={{
+            destination: params.destination,
+            placeId: params.placeId,
+            lat: params.lat,
+            lng: params.lng,
+            destinationConfirmed: params.destinationConfirmed,
+          }}
+          onChange={(dest) =>
+            patch({
+              destination: dest.destination,
+              placeId: dest.placeId,
+              lat: dest.lat,
+              lng: dest.lng,
+              destinationConfirmed: dest.destinationConfirmed,
+              city: dest.destination,
+              cityCode: dest.placeId?.slice(0, 8) ?? "",
+            })
           }
+          onConfirmed={destinationTray.collapse}
         />
-        <Counter
-          label="Children"
-          hint="2–12 years"
-          value={params.guests.children}
-          min={0}
-          onChange={(children) =>
-            patch({ guests: { ...params.guests, children } })
-          }
-        />
-        <p className="mt-2 text-xs text-slate-400">
-          {guestSummary(params.guests, params.rooms)}
-        </p>
-      </div>
+      </MinimizableFilterTray>
+
+      <MinimizableFilterTray
+        label="Dates"
+        summary={datesSummary}
+        open={datesTray.open}
+        onOpenChange={datesTray.setOpen}
+      >
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <DateField
+            label="Check-in"
+            value={params.checkIn}
+            onChange={(checkIn) => patch({ checkIn })}
+            minDate={today}
+          />
+          <DateField
+            label="Check-out"
+            value={params.checkOut}
+            onChange={(checkOut) => patch({ checkOut })}
+            onAfterSelect={datesTray.collapse}
+            minDate={checkOutMin}
+          />
+        </div>
+      </MinimizableFilterTray>
+
+      <MinimizableFilterTray
+        label="Guests"
+        summary={guestsSummaryText}
+        open={guestsTray.open}
+        onOpenChange={guestsTray.setOpen}
+      >
+        <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 p-3">
+          <Counter
+            label="Rooms"
+            hint="Number of rooms"
+            value={params.rooms}
+            min={1}
+            onChange={(rooms) => patch({ rooms })}
+            onAfterChange={guestsTray.collapse}
+          />
+          <Counter
+            label="Adults"
+            hint="12+ years"
+            value={params.guests.adults}
+            min={1}
+            onChange={(adults) =>
+              patch({ guests: { ...params.guests, adults } })
+            }
+            onAfterChange={guestsTray.collapse}
+          />
+          <Counter
+            label="Children"
+            hint="2–12 years"
+            value={params.guests.children}
+            min={0}
+            onChange={(children) =>
+              patch({ guests: { ...params.guests, children } })
+            }
+            onAfterChange={guestsTray.collapse}
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="mt-2 w-full bg-emerald-600 hover:bg-emerald-500"
+            onClick={guestsTray.collapse}
+          >
+            Done
+          </Button>
+        </div>
+      </MinimizableFilterTray>
 
       <Select
         value={params.sort}
@@ -292,10 +289,13 @@ export function HotelSearchForm({ value, onChange }: HotelSearchFormProps) {
           patch({ sort: sort as HotelSearchParams["sort"] })
         }
       >
-        <SelectTrigger className="h-11 w-full border-slate-700 bg-slate-950">
+        <SelectTrigger className="h-11 w-full min-w-0 max-w-full border-slate-700 bg-slate-950">
           <SelectValue placeholder="Sort" />
         </SelectTrigger>
-        <SelectContent className="border-slate-800 bg-slate-900">
+        <SelectContent
+          position="popper"
+          className="max-h-[min(280px,50vh)] border-slate-800 bg-slate-900"
+        >
           {HOTEL_SORT_OPTIONS.map((opt) => (
             <SelectItem key={opt.id} value={opt.id}>
               {opt.label}
