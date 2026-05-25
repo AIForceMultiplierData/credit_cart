@@ -1,4 +1,8 @@
 import { CARD_CATALOG } from "@/lib/card-catalog"
+import {
+  type DealAvailability,
+  resolveDealAvailability,
+} from "@/lib/deal-availability"
 import { getBankLogoUrl } from "@/lib/bank-registry"
 import { cardsReferToSameCard, isCardInWallet } from "@/lib/card-identity"
 import {
@@ -225,4 +229,80 @@ export function buildMissingCardTeasers(input: {
   })
 
   return candidates.slice(0, limit)
+}
+
+export type CatalogOfferRow = MissingCardTeaser & {
+  availability: DealAvailability
+}
+
+/** Every catalog card with savings for a product — wallet, circle, and ping-to-split. */
+export function buildAllCatalogOffers(input: {
+  url: string
+  estimatedPrice: number
+  searchCards: SearchCardInput[]
+  serper: SerperDealContext
+}): CatalogOfferRow[] {
+  const { url, estimatedPrice, searchCards, serper } = input
+  const platform = detectPlatform(url)
+  const offers: CatalogOfferRow[] = []
+
+  for (const catalog of CARD_CATALOG) {
+    const pseudo = catalogAsSearchCard(catalog)
+    const platformHit = platformScoreForCard(url, catalog.card_id)
+    const serperPercent = extractSerperPercentForCard(serper, pseudo)
+    const serperBacked = isSerperBackedForCard(serper, pseudo)
+
+    let discountPercent = Math.max(
+      platformHit?.discountPercent ?? 0,
+      serperPercent ?? 0
+    )
+
+    if (discountPercent <= 0 && serperBacked) {
+      discountPercent = 3
+    }
+
+    if (discountPercent <= 0 && platformHit) {
+      discountPercent = platformHit.discountPercent
+    }
+
+    if (discountPercent <= 0) continue
+
+    const discountAmount = Math.round((estimatedPrice * discountPercent) / 100)
+    const { availability, circleOwnerName } = resolveDealAvailability(
+      catalog,
+      searchCards
+    )
+
+    let reason =
+      platformHit?.reason ??
+      (serperBacked
+        ? `Live offers cite ~${discountPercent}% on ${platform}.`
+        : `Works well for ${platform} spends.`)
+
+    if (availability === "wallet") {
+      reason = "Already in your wallet — pay with this card directly."
+    } else if (availability === "circle" && circleOwnerName) {
+      reason = `${circleOwnerName} has this card in your circle — pool for 50/50.`
+    } else if (availability === "ping_to_split") {
+      reason = "Ping your circle to co-purchase with 50/50 cashback split."
+    }
+
+    offers.push({
+      card_id: catalog.card_id,
+      bank_name: catalog.bank_name,
+      bank_logo_url: getBankLogoUrl(catalog.bank_name, catalog.bank_logo_url),
+      card_name: catalog.card_name,
+      style_classes: catalog.style_classes,
+      discount_percent: discountPercent,
+      discount_amount: discountAmount,
+      reason,
+      in_circle: availability === "circle",
+      circle_owner_name: circleOwnerName,
+      serper_backed: serperBacked,
+      apply_url: catalog.apply_url,
+      availability,
+    })
+  }
+
+  return offers
 }

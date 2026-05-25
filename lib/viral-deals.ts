@@ -1,3 +1,5 @@
+import type { DealAvailability } from "@/lib/deal-availability"
+import type { CatalogOfferRow } from "@/lib/deal-search-missing-cards"
 import type { MissingCardTeaser } from "@/lib/deal-search"
 
 export type ViralDeal = {
@@ -15,10 +17,12 @@ export type ViralDeal = {
   cardDiscount: number
   discountPercent: number
   styleClasses: string
+  availability: DealAvailability
   inCircle: boolean
   circleOwnerName?: string
   serperBacked: boolean
   splitHint: string
+  reason: string
   source: "serper" | "catalog"
 }
 
@@ -26,6 +30,7 @@ export type ViralDealsResult = {
   deals: ViralDeal[]
   used_serper: boolean
   wallet_excluded_count: number
+  circle_count?: number
   summary: string
 }
 
@@ -71,6 +76,63 @@ export const VIRAL_SHOPPING_QUERIES: Array<{
   },
 ]
 
+function splitHintForAvailability(
+  availability: DealAvailability,
+  circleOwnerName?: string
+): string {
+  if (availability === "wallet") {
+    return "In your wallet — pay with this card and keep 100% cashback."
+  }
+  if (availability === "circle") {
+    return `In circle (${circleOwnerName ?? "friend"}) — pool purchase for 50/50 split.`
+  }
+  return "Ping to split — co-purchase with circle for 50/50 cashback."
+}
+
+export function catalogOfferToViralDeal(
+  product: {
+    title: string
+    platform: string
+    url?: string
+    price: number
+  },
+  offer: CatalogOfferRow | (MissingCardTeaser & { availability?: DealAvailability })
+): ViralDeal {
+  const availability =
+    "availability" in offer && offer.availability
+      ? offer.availability
+      : offer.in_circle
+        ? "circle"
+        : "ping_to_split"
+
+  const cardDiscount = offer.discount_amount
+  const discountedPrice = Math.max(product.price - cardDiscount, 0)
+
+  return {
+    id: `${product.platform}:${offer.card_id}:${product.title.slice(0, 36)}`,
+    title: product.title,
+    platform: product.platform,
+    productUrl: product.url,
+    originalPrice: product.price,
+    discountedPrice,
+    cardId: offer.card_id,
+    cardBankName: offer.bank_name,
+    cardName: offer.card_name,
+    bankLogoUrl: offer.bank_logo_url,
+    cardLabel: `${offer.bank_name} ${offer.card_name}`,
+    cardDiscount,
+    discountPercent: offer.discount_percent,
+    styleClasses: offer.style_classes,
+    availability,
+    inCircle: availability === "circle",
+    circleOwnerName: offer.circle_owner_name,
+    serperBacked: offer.serper_backed,
+    splitHint: splitHintForAvailability(availability, offer.circle_owner_name),
+    reason: offer.reason,
+    source: offer.serper_backed ? "serper" : "catalog",
+  }
+}
+
 export function missingTeaserToViralDeal(
   product: {
     title: string
@@ -80,32 +142,65 @@ export function missingTeaserToViralDeal(
   },
   teaser: MissingCardTeaser
 ): ViralDeal {
-  const cardDiscount = teaser.discount_amount
-  const discountedPrice = Math.max(product.price - cardDiscount, 0)
-
-  const splitHint = teaser.in_circle
-    ? `Pool with ${teaser.circle_owner_name ?? "circle"} — 50% cashback split`
-    : "Not in your wallet — pool with circle for 50% split"
-
-  return {
-    id: `${product.platform}:${teaser.card_id}:${product.title.slice(0, 40)}`,
-    title: product.title,
-    platform: product.platform,
-    productUrl: product.url,
-    originalPrice: product.price,
-    discountedPrice,
-    cardId: teaser.card_id,
-    cardBankName: teaser.bank_name,
-    cardName: teaser.card_name,
-    bankLogoUrl: teaser.bank_logo_url,
-    cardLabel: `${teaser.bank_name} ${teaser.card_name}`,
-    cardDiscount,
-    discountPercent: teaser.discount_percent,
-    styleClasses: teaser.style_classes,
-    inCircle: teaser.in_circle,
-    circleOwnerName: teaser.circle_owner_name,
-    serperBacked: teaser.serper_backed,
-    splitHint,
-    source: teaser.serper_backed ? "serper" : "catalog",
-  }
+  return catalogOfferToViralDeal(product, {
+    ...teaser,
+    availability: teaser.in_circle ? "circle" : "ping_to_split",
+  })
 }
+
+/** Curated products so Live Deals is never empty when Serper is down. */
+export const CURATED_LIVE_PRODUCTS: Array<{
+  title: string
+  platform: string
+  url: string
+  price: number
+}> = [
+  {
+    title: "Apple AirPods Pro",
+    platform: "Amazon",
+    url: "https://www.amazon.in",
+    price: 24900,
+  },
+  {
+    title: "Samsung Galaxy Buds FE",
+    platform: "Amazon",
+    url: "https://www.amazon.in",
+    price: 8999,
+  },
+  {
+    title: "Noise ColorFit Smartwatch",
+    platform: "Flipkart",
+    url: "https://www.flipkart.com",
+    price: 3499,
+  },
+  {
+    title: "boAt Airdopes 300",
+    platform: "Flipkart",
+    url: "https://www.flipkart.com",
+    price: 2499,
+  },
+  {
+    title: "Kindle Paperwhite",
+    platform: "Amazon",
+    url: "https://www.amazon.in",
+    price: 13999,
+  },
+  {
+    title: "Goa weekend hotel stay",
+    platform: "MakeMyTrip",
+    url: "https://www.makemytrip.com/hotels/",
+    price: 12499,
+  },
+  {
+    title: "Bengaluru business hotel",
+    platform: "Booking.com",
+    url: "https://www.booking.com",
+    price: 8999,
+  },
+  {
+    title: "Wireless earbuds import pick",
+    platform: "eBay",
+    url: "https://www.ebay.com",
+    price: 5999,
+  },
+]

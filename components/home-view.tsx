@@ -57,7 +57,7 @@ function StatTile({
     : value.toLocaleString("en-IN")
 
   return (
-    <div className="flex h-[4.5rem] w-full flex-col items-center justify-center rounded-xl border border-slate-800/50 bg-slate-900/60 px-2 py-2.5 text-center backdrop-blur-md">
+    <div className="flex h-full min-h-[4.75rem] w-full flex-col items-center justify-center rounded-xl border border-slate-800/50 bg-slate-900/60 px-2 py-3 text-center backdrop-blur-md">
       <Icon className={cn("mb-1 h-3.5 w-3.5 shrink-0", iconClassName)} />
       {loading ? (
         <>
@@ -156,7 +156,7 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         onNeedSignIn={onSignIn}
       />
 
-      <div className="mx-auto mb-6 grid w-full max-w-[70%] grid-cols-2 gap-1.5">
+      <div className="mb-6 grid w-full grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <StatTile
           icon={TrendingUp}
           iconClassName="text-emerald-400"
@@ -182,7 +182,7 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         <button
           type="button"
           onClick={() => onNavigate("wallet")}
-          className="block w-full text-left transition-opacity hover:opacity-90 active:scale-[0.98]"
+          className="flex h-full w-full min-w-0 text-left transition-opacity hover:opacity-90 active:scale-[0.98]"
           aria-label="Open wallet"
         >
           <StatTile

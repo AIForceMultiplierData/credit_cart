@@ -1,8 +1,6 @@
+import { compareDealsByAvailability } from "@/lib/deal-availability"
 import { SERPER_API_KEYS } from "@/lib/llm-router"
-import {
-  buildMissingCardTeasers,
-  estimateWalletBestDiscount,
-} from "@/lib/deal-search-missing-cards"
+import { buildAllCatalogOffers } from "@/lib/deal-search-missing-cards"
 import type { SearchCardInput } from "@/lib/deal-search"
 import {
   fetchSerperPlatformCardOffers,
@@ -11,7 +9,8 @@ import {
   type SerperDealContext,
 } from "@/lib/serper-client"
 import {
-  missingTeaserToViralDeal,
+  catalogOfferToViralDeal,
+  CURATED_LIVE_PRODUCTS,
   VIRAL_SHOPPING_QUERIES,
   type ViralDeal,
   type ViralDealsResult,
@@ -57,11 +56,11 @@ async function loadPlatformSerper(platform: string): Promise<SerperDealContext> 
   }
 }
 
-function pickBestDealForProduct(
+function buildDealsForProduct(
   product: RawProduct,
   searchCards: SearchCardInput[],
   serperByPlatform: Map<string, SerperDealContext>
-): ViralDeal | null {
+): ViralDeal[] {
   const serper =
     serperByPlatform.get(product.platform) ??
     ({
@@ -74,44 +73,18 @@ function pickBestDealForProduct(
     } satisfies SerperDealContext)
 
   const url = productUrlForPlatform(product.platform, product.url)
-  const walletCards = searchCards.filter((c) => c.source === "wallet")
-  const walletBestAmount = estimateWalletBestDiscount(
-    url,
-    product.price,
-    walletCards,
-    serper
-  )
-  const teasers = buildMissingCardTeasers({
+  const offers = buildAllCatalogOffers({
     url,
     estimatedPrice: product.price,
     searchCards,
-    offers: [],
     serper,
-    walletBestAmount,
-    allowEqualToWallet: true,
-    limit: 1,
   })
 
-  const best = teasers[0]
-  if (!best) return null
-
-  return missingTeaserToViralDeal(product, best)
+  return offers.map((offer) => catalogOfferToViralDeal(product, offer))
 }
 
-export async function fetchViralDeals(
-  searchCards: SearchCardInput[],
-  limit = 8
-): Promise<ViralDealsResult> {
-  const walletExcluded = searchCards.filter((c) => c.source === "wallet").length
-
-  if (SERPER_API_KEYS.length === 0) {
-    return {
-      deals: [],
-      used_serper: false,
-      wallet_excluded_count: walletExcluded,
-      summary: "Serper not configured — add SERPER_KEYS on the server.",
-    }
-  }
+async function loadSerperProducts(maxProducts: number): Promise<RawProduct[]> {
+  if (SERPER_API_KEYS.length === 0) return []
 
   const shoppingBatches = await Promise.all(
     VIRAL_SHOPPING_QUERIES.map(async (row) => {
@@ -125,77 +98,72 @@ export async function fetchViralDeals(
     })
   )
 
-  const rawProducts = dedupeProducts(
+  return dedupeProducts(
     shoppingBatches
       .flat()
-      .filter((product) => product.title.length > 4 && product.price > 0)
-  ).slice(0, limit * 2)
+      .filter((p) => p.title.length > 4 && p.price > 0)
+  ).slice(0, maxProducts)
+}
 
-  if (rawProducts.length === 0) {
-    return {
-      deals: [],
-      used_serper: true,
-      wallet_excluded_count: walletExcluded,
-      summary:
-        "Serper returned no priced products. Check SERPER_KEYS on Vercel or try Refresh.",
-    }
+export async function fetchViralDeals(
+  searchCards: SearchCardInput[],
+  limit = 48
+): Promise<ViralDealsResult> {
+  const walletCount = searchCards.filter((c) => c.source === "wallet").length
+  const circleCount = searchCards.filter((c) => c.source === "circle").length
+
+  let serperProducts = await loadSerperProducts(12)
+  const usedSerper = serperProducts.length > 0
+
+  if (serperProducts.length === 0) {
+    serperProducts = CURATED_LIVE_PRODUCTS.map((p) => ({ ...p }))
   }
 
-  const platforms = [...new Set(rawProducts.map((p) => p.platform))]
+  const platforms = [...new Set(serperProducts.map((p) => p.platform))]
   const serperByPlatform = new Map<string, SerperDealContext>()
 
   await Promise.all(
     platforms.map(async (platform) => {
-      serperByPlatform.set(platform, await loadPlatformSerper(platform))
+      if (SERPER_API_KEYS.length > 0) {
+        serperByPlatform.set(platform, await loadPlatformSerper(platform))
+      } else {
+        serperByPlatform.set(platform, {
+          used_serper: false,
+          price: null,
+          product_snippets: [],
+          card_offer_snippets: [],
+          shopping_results: [],
+          queries_run: [],
+        })
+      }
     })
   )
 
-  const deals: ViralDeal[] = []
+  const allDeals: ViralDeal[] = []
 
-  for (const product of rawProducts) {
-    if (deals.length >= limit) break
-
-    let deal = pickBestDealForProduct(product, searchCards, serperByPlatform)
-
-    if (!deal) {
-      const teasers = buildMissingCardTeasers({
-        url: productUrlForPlatform(product.platform, product.url),
-        estimatedPrice: product.price,
-        searchCards,
-        offers: [],
-        serper:
-          serperByPlatform.get(product.platform) ??
-          ({
-            used_serper: false,
-            price: product.price,
-            product_snippets: [],
-            card_offer_snippets: [],
-            shopping_results: [],
-            queries_run: [],
-          } satisfies SerperDealContext),
-        walletBestAmount: 0,
-        allowEqualToWallet: true,
-        limit: 1,
-      })
-      const best = teasers[0]
-      if (best) deal = missingTeaserToViralDeal(product, best)
-    }
-
-    if (deal) {
-      deals.push(deal)
-    }
+  for (const product of serperProducts) {
+    const rows = buildDealsForProduct(product, searchCards, serperByPlatform)
+    allDeals.push(...rows)
   }
 
-  deals.sort((a, b) => b.cardDiscount - a.cardDiscount)
+  allDeals.sort(compareDealsByAvailability)
+
+  const deals = allDeals.slice(0, limit)
+
+  const pingCount = deals.filter((d) => d.availability === "ping_to_split").length
+  const circleDealCount = deals.filter((d) => d.availability === "circle").length
+  const walletDealCount = deals.filter((d) => d.availability === "wallet").length
+
+  const summary =
+    deals.length > 0
+      ? `${deals.length} deals · ${pingCount} ping to split · ${circleDealCount} circle · ${walletDealCount} wallet`
+      : "Add a card to your wallet to unlock live deal rankings."
 
   return {
     deals,
-    used_serper:
-      deals.some((d) => d.source === "serper") || rawProducts.length > 0,
-    wallet_excluded_count: walletExcluded,
-    summary:
-      deals.length > 0
-        ? `${deals.length} live deal${deals.length === 1 ? "" : "s"} outside your circle.`
-        : "No stronger outside-wallet card for these picks. Try Refresh or add a different platform card.",
+    used_serper: usedSerper,
+    wallet_excluded_count: walletCount,
+    circle_count: circleCount,
+    summary,
   }
 }
