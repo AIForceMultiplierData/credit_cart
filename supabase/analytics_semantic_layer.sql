@@ -78,7 +78,9 @@ from public.card_banks;
 
 create or replace view analytics.dim_card as
 select
-  c.card_id,
+  coalesce(c.card_slug, c.card_id::text) as card_id,
+  c.card_id as card_uuid,
+  c.card_slug,
   c.bank_id,
   c.bank_name,
   c.card_name,

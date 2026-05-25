@@ -1,7 +1,7 @@
--- PoolPay card master dimension (run in Supabase SQL Editor after card_catalog.sql)
--- Banks = master dimension for bank picker; card_catalog = card population for selection.
+-- PoolPay card master dimension (run in Supabase SQL Editor)
+-- Safe for card_catalog.card_id = text OR uuid (adds card_slug for app slugs like hdfc_millennia)
 
--- ── Banks master ─────────────────────────────────────────────────────────────
+-- ── Step 1: Banks master (always run this block first) ─────────────────────────
 create table if not exists public.card_banks (
   bank_id text primary key,
   bank_name text not null unique,
@@ -38,41 +38,108 @@ on conflict (bank_id) do update set
   is_active = true,
   updated_at = now();
 
--- ── Extend card_catalog ────────────────────────────────────────────────────────
+-- ── Step 2: Extend card_catalog (no slug in WHERE on uuid PK) ─────────────────
 alter table public.card_catalog
-  add column if not exists bank_id text references public.card_banks (bank_id),
+  add column if not exists card_slug text,
+  add column if not exists bank_id text,
   add column if not exists bank_logo_url text,
   add column if not exists network text,
   add column if not exists card_tier text,
   add column if not exists apply_url text,
   add column if not exists annual_fee_inr int,
-  add column if not exists updated_at timestamptz not null default now();
+  add column if not exists updated_at timestamptz default now();
+
+-- FK only if not already present
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'card_catalog_bank_id_fkey'
+  ) then
+    alter table public.card_catalog
+      add constraint card_catalog_bank_id_fkey
+      foreign key (bank_id) references public.card_banks (bank_id);
+  end if;
+exception
+  when others then null;
+end $$;
+
+-- Generate slugs from bank + card name (works when card_id is uuid)
+update public.card_catalog
+set card_slug = lower(
+  regexp_replace(trim(bank_name), '[^a-zA-Z0-9]+', '_', 'g')
+  || '_'
+  || regexp_replace(trim(card_name), '[^a-zA-Z0-9]+', '_', 'g')
+)
+where card_slug is null or card_slug = '';
+
+-- Known slug overrides (canonical app ids)
+update public.card_catalog set card_slug = 'hdfc_millennia' where upper(bank_name) = 'HDFC' and card_name ilike '%millennia%';
+update public.card_catalog set card_slug = 'hdfc_regalia' where upper(bank_name) = 'HDFC' and card_name ilike '%regalia%';
+update public.card_catalog set card_slug = 'hdfc_diners' where upper(bank_name) = 'HDFC' and (card_name ilike '%diners%' or card_name ilike '%black%');
+update public.card_catalog set card_slug = 'sbi_cashback' where upper(bank_name) = 'SBI' and card_name ilike '%cashback%';
+update public.card_catalog set card_slug = 'sbi_simplyclick' where upper(bank_name) = 'SBI' and card_name ilike '%simplyclick%';
+update public.card_catalog set card_slug = 'icici_amazon' where upper(bank_name) = 'ICICI' and card_name ilike '%amazon%';
+update public.card_catalog set card_slug = 'icici_sapphiro' where upper(bank_name) = 'ICICI' and card_name ilike '%sapphiro%';
+update public.card_catalog set card_slug = 'axis_flipkart' where upper(bank_name) = 'AXIS' and card_name ilike '%flipkart%';
+update public.card_catalog set card_slug = 'axis_magnus' where upper(bank_name) = 'AXIS' and card_name ilike '%magnus%';
+
+create unique index if not exists card_catalog_card_slug_key
+  on public.card_catalog (card_slug)
+  where card_slug is not null;
 
 -- Backfill bank_id + logo from bank_name
 update public.card_catalog c
 set
   bank_id = b.bank_id,
   bank_logo_url = b.logo_url,
-  updated_at = now()
+  updated_at = coalesce(c.updated_at, now())
 from public.card_banks b
-where upper(c.bank_name) = upper(b.bank_name)
-  and (c.bank_id is null or c.bank_logo_url is null);
+where upper(c.bank_name) = upper(b.bank_name);
 
--- Seed apply URLs for known cards
-update public.card_catalog set apply_url = 'https://www.hdfc.bank.in/credit-cards/millenia-credit-card', network = 'visa', card_tier = 'mid' where card_id = 'hdfc_millennia';
-update public.card_catalog set apply_url = 'https://www.hdfc.bank.in/credit-cards/regalia-gold-credit-card', network = 'visa', card_tier = 'premium' where card_id = 'hdfc_regalia';
-update public.card_catalog set apply_url = 'https://www.hdfc.bank.in/credit-cards/diners-club-black-credit-card', network = 'diners', card_tier = 'premium' where card_id = 'hdfc_diners';
-update public.card_catalog set apply_url = 'https://www.sbicard.com/en/personal/credit-cards/cashback-sbi-card.page', network = 'visa', card_tier = 'entry' where card_id = 'sbi_cashback';
-update public.card_catalog set apply_url = 'https://www.sbicard.com/en/personal/credit-cards/simplyclick-sbi-card.page', network = 'visa', card_tier = 'entry' where card_id = 'sbi_simplyclick';
-update public.card_catalog set apply_url = 'https://www.icicibank.com/personal-banking/cards/credit-card/amazon-pay-icici-bank-credit-card', network = 'visa', card_tier = 'mid' where card_id = 'icici_amazon';
-update public.card_catalog set apply_url = 'https://www.icicibank.com/personal-banking/cards/credit-card/sapphiro-credit-card', network = 'mastercard', card_tier = 'premium' where card_id = 'icici_sapphiro';
-update public.card_catalog set apply_url = 'https://www.axis.bank.in/cards/credit-card/flipkart-axis-bank-credit-card', network = 'visa', card_tier = 'mid' where card_id = 'axis_flipkart';
-update public.card_catalog set apply_url = 'https://www.axis.bank.in/cards/credit-card/axis-bank-magnus-credit-card', network = 'visa', card_tier = 'premium' where card_id = 'axis_magnus';
+-- Seed apply URLs by bank + card name (NOT by uuid/text card_id)
+update public.card_catalog
+set apply_url = 'https://www.hdfc.bank.in/credit-cards/millenia-credit-card', network = 'visa', card_tier = 'mid'
+where upper(bank_name) = 'HDFC' and card_name ilike '%millennia%';
 
--- ── Enriched read view (master dimension for UI) ─────────────────────────────
+update public.card_catalog
+set apply_url = 'https://www.hdfc.bank.in/credit-cards/regalia-gold-credit-card', network = 'visa', card_tier = 'premium'
+where upper(bank_name) = 'HDFC' and card_name ilike '%regalia%';
+
+update public.card_catalog
+set apply_url = 'https://www.hdfc.bank.in/credit-cards/diners-club-black-credit-card', network = 'diners', card_tier = 'premium'
+where upper(bank_name) = 'HDFC' and (card_name ilike '%diners%' or card_name ilike '%black%');
+
+update public.card_catalog
+set apply_url = 'https://www.sbicard.com/en/personal/credit-cards/cashback-sbi-card.page', network = 'visa', card_tier = 'entry'
+where upper(bank_name) = 'SBI' and card_name ilike '%cashback%';
+
+update public.card_catalog
+set apply_url = 'https://www.sbicard.com/en/personal/credit-cards/simplyclick-sbi-card.page', network = 'visa', card_tier = 'entry'
+where upper(bank_name) = 'SBI' and card_name ilike '%simplyclick%';
+
+update public.card_catalog
+set apply_url = 'https://www.icicibank.com/personal-banking/cards/credit-card/amazon-pay-icici-bank-credit-card', network = 'visa', card_tier = 'mid'
+where upper(bank_name) = 'ICICI' and card_name ilike '%amazon%';
+
+update public.card_catalog
+set apply_url = 'https://www.icicibank.com/personal-banking/cards/credit-card/sapphiro-credit-card', network = 'mastercard', card_tier = 'premium'
+where upper(bank_name) = 'ICICI' and card_name ilike '%sapphiro%';
+
+update public.card_catalog
+set apply_url = 'https://www.axis.bank.in/cards/credit-card/flipkart-axis-bank-credit-card', network = 'visa', card_tier = 'mid'
+where upper(bank_name) = 'AXIS' and card_name ilike '%flipkart%';
+
+update public.card_catalog
+set apply_url = 'https://www.axis.bank.in/cards/credit-card/axis-bank-magnus-credit-card', network = 'visa', card_tier = 'premium'
+where upper(bank_name) = 'AXIS' and card_name ilike '%magnus%';
+
+-- ── Step 3: Enriched view (card_id = slug for app compatibility) ───────────────
 create or replace view public.card_catalog_master as
 select
-  c.card_id,
+  coalesce(c.card_slug, c.card_id::text) as card_id,
+  c.card_id as card_uuid,
+  c.card_slug,
   c.bank_id,
   c.bank_name,
   coalesce(c.bank_logo_url, b.logo_url) as bank_logo_url,
