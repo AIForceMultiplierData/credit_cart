@@ -3,20 +3,29 @@
 import type { DealSearchResult } from "@/lib/deal-search"
 import { DealOfferDetail } from "@/components/deal-offer-detail"
 import { TravelListingsPanel } from "@/components/travel-listings-panel"
+import { TravelBookCta } from "@/components/travel-book-cta"
 import { MissingCardTeasers } from "@/components/missing-card-teasers"
+import type { FlightSearchParams } from "@/lib/flight-search"
+import type { HotelSearchParams } from "@/lib/hotel-search"
 import { formatInr } from "@/lib/deal-offer-breakdown"
 import { cn } from "@/lib/utils"
 
 type DealSearchResultsProps = {
   result: DealSearchResult
+  flightSearch?: FlightSearchParams | null
+  hotelSearch?: HotelSearchParams | null
   onSelectListing?: (listingId: string, price: number) => void
   onNeedSignIn?: () => void
+  onApplyBestCard?: () => void
 }
 
 export function DealSearchResults({
   result,
+  flightSearch,
+  hotelSearch,
   onSelectListing,
   onNeedSignIn,
+  onApplyBestCard,
 }: DealSearchResultsProps) {
   const isTravel =
     result.category === "flight" || result.category === "hotels"
@@ -74,6 +83,21 @@ export function DealSearchResults({
           </p>
           <DealOfferDetail offer={result.best_offer} highlight />
         </div>
+      ) : null}
+
+      {isTravel && (flightSearch || hotelSearch) ? (
+        <TravelBookCta
+          className="mb-3"
+          category={travelCategory}
+          flightSearch={flightSearch}
+          hotelSearch={hotelSearch}
+          bestCardLabel={
+            result.best_offer
+              ? `${result.best_offer.bank_name} ${result.best_offer.card_name}`
+              : null
+          }
+          onApplyCard={onApplyBestCard}
+        />
       ) : null}
 
       <p className="mb-3 text-sm text-slate-400">{result.summary}</p>

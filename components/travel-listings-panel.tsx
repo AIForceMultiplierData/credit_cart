@@ -36,8 +36,8 @@ export function TravelListingsPanel({
         </span>
       </div>
       <p className="text-[11px] leading-relaxed text-slate-500">
-        Tap a result to lock fare for card ranking. Estimates refresh when you
-        search again.
+        Tap a fare to lock it for card ranking. Book on MakeMyTrip, Cleartrip, or
+        Booking.com via the buttons below — your route and dates are pre-filled.
       </p>
 
       <div className="space-y-2">

@@ -1,4 +1,6 @@
 import type { DealAvailability } from "@/lib/deal-availability"
+import { resolveBankProfile } from "@/lib/bank-registry"
+import { resolveCardImageUrl } from "@/lib/card-photo-registry"
 import type { CatalogOfferRow } from "@/lib/deal-search-missing-cards"
 import type { MissingCardTeaser } from "@/lib/deal-search"
 
@@ -10,9 +12,11 @@ export type ViralDeal = {
   originalPrice: number
   discountedPrice: number
   cardId: string
+  bankId?: string | null
   cardBankName: string
   cardName: string
   bankLogoUrl?: string | null
+  cardImageUrl?: string | null
   cardLabel: string
   cardDiscount: number
   discountPercent: number
@@ -32,6 +36,13 @@ export type ViralDealsResult = {
   wallet_excluded_count: number
   circle_count?: number
   summary: string
+  counts?: {
+    total: number
+    ping: number
+    circle: number
+    wallet: number
+  }
+  from_cache?: boolean
 }
 
 export const VIRAL_SHOPPING_QUERIES: Array<{
@@ -107,6 +118,8 @@ export function catalogOfferToViralDeal(
 
   const cardDiscount = offer.discount_amount
   const discountedPrice = Math.max(product.price - cardDiscount, 0)
+  const bank = resolveBankProfile(offer.bank_name, offer.card_id.split("_")[0])
+  const cardImageUrl = resolveCardImageUrl(offer.card_id)
 
   return {
     id: `${product.platform}:${offer.card_id}:${product.title.slice(0, 36)}`,
@@ -116,9 +129,11 @@ export function catalogOfferToViralDeal(
     originalPrice: product.price,
     discountedPrice,
     cardId: offer.card_id,
+    bankId: bank.bank_id,
     cardBankName: offer.bank_name,
     cardName: offer.card_name,
-    bankLogoUrl: offer.bank_logo_url,
+    bankLogoUrl: offer.bank_logo_url ?? bank.logo_url,
+    cardImageUrl,
     cardLabel: `${offer.bank_name} ${offer.card_name}`,
     cardDiscount,
     discountPercent: offer.discount_percent,

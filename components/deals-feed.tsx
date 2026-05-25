@@ -1,17 +1,19 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   Loader2,
   RefreshCw,
   TrendingDown,
+  Users,
+  Wallet,
   Zap,
 } from "lucide-react"
 import { useCardLead } from "@/components/card-lead-provider"
 import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
 import { DealAvailabilityBadge } from "@/components/deal-availability-badge"
 import type { DealAvailability } from "@/lib/deal-availability"
-import type { ViralDeal } from "@/lib/viral-deals"
+import type { ViralDeal, ViralDealsResult } from "@/lib/viral-deals"
 import { useAuth } from "@/hooks/useAuth"
 import { useDealSearchCards } from "@/hooks/useDealSearchCards"
 import { cn } from "@/lib/utils"
@@ -41,6 +43,38 @@ export interface Deal {
   splitHint?: string
   serperBacked?: boolean
 }
+
+type FeedFilter = "all" | DealAvailability
+
+const FILTER_TABS: Array<{
+  id: FeedFilter
+  label: string
+  countKey?: "ping" | "circle" | "wallet"
+  icon?: React.ComponentType<{ className?: string }>
+  activeClass: string
+}> = [
+  {
+    id: "ping_to_split",
+    label: "Ping to split",
+    countKey: "ping",
+    icon: Zap,
+    activeClass: "border-violet-500/60 bg-violet-500/15 text-violet-200",
+  },
+  {
+    id: "circle",
+    label: "Circle",
+    countKey: "circle",
+    icon: Users,
+    activeClass: "border-blue-500/60 bg-blue-500/15 text-blue-200",
+  },
+  {
+    id: "wallet",
+    label: "Wallet",
+    countKey: "wallet",
+    icon: Wallet,
+    activeClass: "border-emerald-500/60 bg-emerald-500/15 text-emerald-200",
+  },
+]
 
 function viralDealToLegacyDeal(deal: ViralDeal): Deal {
   return {
@@ -72,69 +106,99 @@ interface DealsFeedProps {
 }
 
 export function DealsFeed({ onDealClick }: DealsFeedProps) {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const { searchCards, loading: cardsLoading } = useDealSearchCards(user?.id)
   const { openLeadForm } = useCardLead()
   const [deals, setDeals] = useState<ViralDeal[]>([])
-  const [summary, setSummary] = useState<string>("")
+  const [summary, setSummary] = useState("")
+  const [tabCounts, setTabCounts] = useState({ ping: 0, circle: 0, wallet: 0, total: 0 })
   const [usedSerper, setUsedSerper] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeFilter, setActiveFilter] = useState<FeedFilter>("all")
 
-  const loadDeals = useCallback(async () => {
-    if (!user) {
-      setDeals([])
-      setSummary("Sign in to see live deals ranked by 50/50 split opportunity.")
-      return
-    }
+  const loadDeals = useCallback(
+    async (opts?: { refresh?: boolean; filter?: FeedFilter }) => {
+      const refresh = opts?.refresh ?? false
+      const filter = opts?.filter ?? activeFilter
 
-    if (cardsLoading) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch("/api/deals/viral", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ searchCards }),
-      })
-
-      const payload = (await response.json()) as {
-        deals?: ViralDeal[]
-        summary?: string
-        used_serper?: boolean
-        error?: string
+      if (!user) {
+        setDeals([])
+        setSummary("Sign in to see AI-curated deals ranked by 50/50 split opportunity.")
+        return
       }
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to load deals.")
+      if (cardsLoading) return
+
+      const token = session?.access_token
+      if (!token) {
+        setError("Session expired — sign in again.")
+        return
       }
 
-      setDeals(payload.deals ?? [])
-      setSummary(payload.summary ?? "")
-      setUsedSerper(Boolean(payload.used_serper))
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not load viral deals."
-      setError(message)
-      setDeals([])
-    } finally {
-      setLoading(false)
-    }
-  }, [user, searchCards, cardsLoading])
+      setLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch("/api/deals/viral", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            searchCards,
+            availability: filter === "all" ? "all" : filter,
+            refresh,
+          }),
+        })
+
+        const payload = (await response.json()) as ViralDealsResult & {
+          error?: string
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to load deals.")
+        }
+
+        setDeals(payload.deals ?? [])
+        setSummary(payload.summary ?? "")
+        setUsedSerper(Boolean(payload.used_serper))
+        if (payload.counts) {
+          setTabCounts({
+            ping: payload.counts.ping,
+            circle: payload.counts.circle,
+            wallet: payload.counts.wallet,
+            total: payload.counts.total,
+          })
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not load viral deals."
+        setError(message)
+        setDeals([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [user, session?.access_token, searchCards, cardsLoading, activeFilter]
+  )
 
   useEffect(() => {
-    void loadDeals()
-  }, [loadDeals])
+    if (!user || cardsLoading) return
+    void loadDeals({ refresh: true, filter: activeFilter })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial fetch when cards ready
+  }, [user?.id, cardsLoading])
 
-  const counts = useMemo(() => {
-    return {
-      ping: deals.filter((d) => d.availability === "ping_to_split").length,
-      circle: deals.filter((d) => d.availability === "circle").length,
-      wallet: deals.filter((d) => d.availability === "wallet").length,
-    }
-  }, [deals])
+  const handleFilterChange = (filter: FeedFilter) => {
+    setActiveFilter(filter)
+    void loadDeals({ refresh: false, filter })
+  }
+
+  const countForTab = (key?: "ping" | "circle" | "wallet") => {
+    if (!key) return tabCounts.total
+    return tabCounts[key]
+  }
 
   return (
     <div className="px-4 pb-32 pt-2">
@@ -155,30 +219,57 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
           )}
         </div>
         <h1 className="text-balance text-2xl font-bold text-slate-50">
-          All deals · ranked for you
+          AI-Curated Deals for you
         </h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Ping to split first, then circle pool, then your wallet.
-        </p>
         {summary && user ? (
           <p className="mt-2 text-xs font-medium text-emerald-300/80">{summary}</p>
         ) : null}
       </div>
 
-      {user && deals.length > 0 ? (
-        <div className="mb-4 flex flex-wrap gap-2">
-          <DealAvailabilityBadge availability="ping_to_split" />
-          <span className="self-center text-[10px] text-slate-500">
-            {counts.ping}
-          </span>
-          <DealAvailabilityBadge availability="circle" />
-          <span className="self-center text-[10px] text-slate-500">
-            {counts.circle}
-          </span>
-          <DealAvailabilityBadge availability="wallet" />
-          <span className="self-center text-[10px] text-slate-500">
-            {counts.wallet}
-          </span>
+      {user ? (
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button
+            type="button"
+            onClick={() => handleFilterChange("all")}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors",
+              activeFilter === "all"
+                ? "border-slate-500/60 bg-slate-700/50 text-slate-100"
+                : "border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700"
+            )}
+          >
+            All
+            <span className="tabular-nums text-slate-500">{tabCounts.total}</span>
+          </button>
+          {FILTER_TABS.map((tab) => {
+            const Icon = tab.icon
+            const count = countForTab(tab.countKey)
+            const isActive = activeFilter === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleFilterChange(tab.id)}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors",
+                  isActive
+                    ? tab.activeClass
+                    : "border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700"
+                )}
+              >
+                {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
+                {tab.label}
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    isActive ? "opacity-90" : "text-slate-500"
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
       ) : null}
 
@@ -188,7 +279,7 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
           size="sm"
           variant="outline"
           disabled={loading || cardsLoading || !user}
-          onClick={() => void loadDeals()}
+          onClick={() => void loadDeals({ refresh: true, filter: activeFilter })}
           className="border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800"
         >
           {loading ? (
@@ -219,14 +310,14 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
             type="button"
             size="sm"
             className="mt-3"
-            onClick={() => void loadDeals()}
+            onClick={() => void loadDeals({ refresh: true, filter: activeFilter })}
           >
             Retry
           </Button>
         </div>
       ) : deals.length === 0 ? (
         <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-6 text-center">
-          <p className="font-medium text-slate-300">Loading deals…</p>
+          <p className="font-medium text-slate-300">No deals in this filter</p>
           <p className="mt-1 text-sm text-slate-500">{summary}</p>
         </div>
       ) : (
@@ -268,11 +359,14 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
                 </div>
                 <CardCatalogThumbnail
                   cardId={deal.cardId}
+                  bankId={deal.bankId}
                   bankName={deal.cardBankName}
                   bankLogoUrl={deal.bankLogoUrl}
+                  cardImageUrl={deal.cardImageUrl}
                   cardName={deal.cardName}
                   styleClasses={deal.styleClasses}
-                  className="w-[4.5rem] shrink-0"
+                  size="md"
+                  className="w-[7.25rem] shrink-0 shadow-lg shadow-black/20"
                 />
               </div>
 

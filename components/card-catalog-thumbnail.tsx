@@ -12,6 +12,7 @@ type CardCatalogThumbnailProps = {
   cardImageUrl?: string | null
   className?: string
   subtitle?: React.ReactNode
+  size?: "sm" | "md"
 }
 
 export function CardCatalogThumbnail({
@@ -24,6 +25,7 @@ export function CardCatalogThumbnail({
   cardImageUrl,
   className,
   subtitle,
+  size = "sm",
 }: CardCatalogThumbnailProps) {
   return (
     <CardVisual
@@ -36,7 +38,7 @@ export function CardCatalogThumbnail({
       cardImageUrl={cardImageUrl}
       className={className}
       subtitle={subtitle}
-      size="sm"
+      size={size}
     />
   )
 }

@@ -150,14 +150,15 @@ export async function fetchViralDeals(
 
   const deals = allDeals.slice(0, limit)
 
-  const pingCount = deals.filter((d) => d.availability === "ping_to_split").length
-  const circleDealCount = deals.filter((d) => d.availability === "circle").length
-  const walletDealCount = deals.filter((d) => d.availability === "wallet").length
+  const pingCount = allDeals.filter((d) => d.availability === "ping_to_split").length
+  const circleDealCount = allDeals.filter((d) => d.availability === "circle").length
+  const walletDealCount = allDeals.filter((d) => d.availability === "wallet").length
+  const totalCount = allDeals.length
 
   const summary =
-    deals.length > 0
-      ? `${deals.length} deals · ${pingCount} ping to split · ${circleDealCount} circle · ${walletDealCount} wallet`
-      : "Add a card to your wallet to unlock live deal rankings."
+    totalCount > 0
+      ? `${totalCount} deals · ${pingCount} ping to split · ${circleDealCount} circle · ${walletDealCount} wallet`
+      : "Add a card to your wallet to unlock AI-curated deals."
 
   return {
     deals,
@@ -165,5 +166,11 @@ export async function fetchViralDeals(
     wallet_excluded_count: walletCount,
     circle_count: circleCount,
     summary,
+    counts: {
+      total: totalCount,
+      ping: pingCount,
+      circle: circleDealCount,
+      wallet: walletDealCount,
+    },
   }
 }

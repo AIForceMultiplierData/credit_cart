@@ -35,6 +35,7 @@ import {
 import { DealSearchResults } from "@/components/deal-search-results"
 import { FlightSearchForm } from "@/components/flight-search-form"
 import { HotelSearchForm } from "@/components/hotel-search-form"
+import { useCardLead } from "@/components/card-lead-provider"
 import {
   Tooltip,
   TooltipContent,
@@ -46,7 +47,7 @@ const DEAL_FINDER_HELP_ITEMS = [
   "Paste URL → best card + exact ₹ off & pay amount",
   "Wallet + circle cards ranked with T&C",
   "Pool with circle → 50/50 cashback split",
-  "Flights / hotels → route, fare, then best card",
+  "Flights / hotels → rank cards, then book on OTA (pre-filled link)",
   "See cards to apply for bigger savings",
 ] as const
 
@@ -88,6 +89,7 @@ export function DealSearchBar({
   onNeedSignIn,
 }: DealSearchBarProps) {
   const { user, loading: authLoading } = useAuth()
+  const { openLeadForm } = useCardLead()
   const { searchCards, walletCount, circleCount, loading: cardsLoading } =
     useDealSearchCards(user?.id)
   const [category, setCategory] = useState<DealSearchCategory>("product")
@@ -351,12 +353,25 @@ export function DealSearchBar({
       {result ? (
         <DealSearchResults
           result={result}
+          flightSearch={category === "flight" ? flightSearch : null}
+          hotelSearch={category === "hotels" ? hotelSearch : null}
           onSelectListing={
             TRAVEL_CATEGORIES.has(category)
               ? (id, price) => void handleListingSelect(id, price)
               : undefined
           }
           onNeedSignIn={onNeedSignIn}
+          onApplyBestCard={
+            result.best_offer
+              ? () =>
+                  openLeadForm({
+                    card_id: result.best_offer!.card_id,
+                    bank_name: result.best_offer!.bank_name,
+                    card_name: result.best_offer!.card_name,
+                    source: "travel_deal_search",
+                  })
+              : undefined
+          }
         />
       ) : null}
     </div>

@@ -18,7 +18,8 @@ Execute scripts in **Supabase Dashboard → SQL Editor** in this order. Each fil
 | 9 | `lender_feed_fix.sql` | Lender RLS, view, trust, **`get_lender_opportunities`** |
 | 10 | `lender_opportunities_rpc.sql` | Standalone RPC patch (if step 9 already run) |
 | 11 | `wallet_lending_toggle.sql` | `active_for_lending` normalization |
-| 12 | `credit_card_leads.sql` | Leads table + storage bucket |
+| 12 | `deals_live_feed.sql` | Cached Live Deals feed per user (Deals tab filters) |
+| 12b | `credit_card_leads.sql` | Leads table + storage bucket |
 | 13 | `profile_dashboard_stats.sql` | Home stats columns |
 | 14 | `fulfillment.sql` | Order fulfillment flow (optional) |
 | 15 | `disputes.sql` | Dispute flow (optional) |

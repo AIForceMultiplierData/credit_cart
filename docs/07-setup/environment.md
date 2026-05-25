@@ -9,8 +9,12 @@
 | `GROQ_KEYS` | Yes* | No | Primary LLM |
 | `CEREBRAS_KEYS` | No | No | LLM fallback |
 | `GEMINI_KEYS` | No | No | LLM fallback |
+| `GOOGLE_MAPS_API_KEY` | For hotels | No | Places + map embed for hotel destination |
+| `NEXT_PUBLIC_TRAVELPAYOUTS_MARKER` | No | Yes | Travelpayouts affiliate wrapper for OTA deep links |
 
 \*App works in degraded mode without them (rules-only deals, empty viral feed).
+
+Without `NEXT_PUBLIC_TRAVELPAYOUTS_MARKER`, flight/hotel “Book on MakeMyTrip / Booking.com” buttons still open the OTA with search pre-filled — you just skip commission tracking until you add your marker from [Travelpayouts](https://www.travelpayouts.com).
 
 ---
 
