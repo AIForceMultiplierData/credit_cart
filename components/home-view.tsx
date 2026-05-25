@@ -1,14 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import {
-  ArrowRight,
-  CreditCard,
-  Sparkles,
-  TrendingUp,
-  Users,
-  Zap,
-} from "lucide-react"
+import { CreditCard, Sparkles, TrendingUp, Users, Zap } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DealSearchBar } from "@/components/deal-search-bar"
 import { useAuth } from "@/hooks/useAuth"
@@ -86,17 +79,17 @@ function WalletStatCard({
   cardCount: number
 }) {
   return (
-    <div className="flex aspect-square flex-col items-center justify-center rounded-2xl border border-slate-800/50 bg-slate-900/60 p-3 text-center backdrop-blur-md">
-      <CreditCard className="mb-2 h-5 w-5 text-blue-400" />
+    <div className="flex flex-col items-center justify-center rounded-xl border border-slate-800/50 bg-slate-900/60 px-2 py-2.5 text-center backdrop-blur-md">
+      <CreditCard className="mb-1 h-3.5 w-3.5 text-blue-400" />
       {loading ? (
         <>
-          <Skeleton className="mb-2 h-7 w-8 bg-slate-800" />
-          <Skeleton className="h-3 w-16 bg-slate-800/80" />
+          <Skeleton className="mb-1 h-4 w-6 bg-slate-800" />
+          <Skeleton className="h-2.5 w-14 bg-slate-800/80" />
         </>
       ) : (
         <>
-          <p className="text-lg font-bold text-slate-50">{cardCount}</p>
-          <p className="text-xs text-slate-500">Wallet cards</p>
+          <p className="text-sm font-bold leading-none text-slate-50">{cardCount}</p>
+          <p className="mt-1 text-[10px] leading-none text-slate-500">Wallet</p>
         </>
       )}
     </div>
@@ -183,7 +176,7 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         onNeedSignIn={onSignIn}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-2">
+      <div className="mx-auto mb-6 grid w-full max-w-[70%] grid-cols-2 gap-1.5">
         <StatCard
           icon={TrendingUp}
           iconClassName="text-emerald-400"
@@ -212,78 +205,6 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
           aria-label="Open wallet"
         >
           <WalletStatCard loading={statsLoading} cardCount={cardCount} />
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        <h2 className="mb-3 text-lg font-semibold text-slate-50">Quick Actions</h2>
-
-        <button
-          onClick={() => onNavigate("deals")}
-          className={cn(
-            "group flex w-full items-center justify-between p-4",
-            "rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-emerald-500/5",
-            "transition-all duration-300 hover:border-emerald-500/40"
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20">
-              <Zap className="h-6 w-6 text-emerald-400" />
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-slate-50">Browse Live Deals</p>
-              <p className="text-sm text-slate-400">
-                {stats.active_deals_count} active deal
-                {stats.active_deals_count === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 text-emerald-400 transition-transform group-hover:translate-x-1" />
-        </button>
-
-        <button
-          onClick={() => onNavigate("wallet")}
-          className={cn(
-            "group flex w-full items-center justify-between p-4",
-            "rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-500/10 to-blue-500/5",
-            "transition-all duration-300 hover:border-blue-500/40"
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
-              <Sparkles className="h-6 w-6 text-blue-400" />
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-slate-50">Manage Wallet</p>
-              <p className="text-sm text-slate-400">
-                {cardCount} card{cardCount === 1 ? "" : "s"} in wallet
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 text-blue-400 transition-transform group-hover:translate-x-1" />
-        </button>
-
-        <button
-          onClick={() => onNavigate("activity")}
-          className={cn(
-            "group flex w-full items-center justify-between p-4",
-            "rounded-2xl border border-purple-500/20 bg-gradient-to-r from-purple-500/10 to-purple-500/5",
-            "transition-all duration-300 hover:border-purple-500/40"
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/20">
-              <TrendingUp className="h-6 w-6 text-purple-400" />
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-slate-50">View Activity</p>
-              <p className="text-sm text-slate-400">
-                {stats.active_deals_count} contract
-                {stats.active_deals_count === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 text-purple-400 transition-transform group-hover:translate-x-1" />
         </button>
       </div>
     </div>

@@ -8,12 +8,11 @@ import { type Deal } from "@/components/deals-feed"
 import { WalletView } from "@/components/wallet-view"
 import { ActivityView } from "@/components/activity-view"
 import { PingDrawer } from "@/components/ping-drawer"
-import { ProfileMenu } from "@/components/profile-menu"
+import { AppHeader } from "@/components/app-header"
 import { ProfileEditModal } from "@/components/profile-edit-modal"
 import { signInWithGoogle } from "@/lib/sign-in"
 import { useAuth } from "@/hooks/useAuth"
 import { useProfile } from "@/hooks/useProfile"
-import { cn } from "@/lib/utils"
 
 type TabType = "home" | "wallet" | "deals" | "activity"
 
@@ -44,25 +43,13 @@ export default function HomePage() {
       <div className="max-w-md mx-auto min-h-screen relative border-x border-slate-800 overflow-x-hidden bg-slate-950">
         {/* Status Bar Mockup */}
         <div className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
-          <div
-            className={cn(
-              "flex items-center justify-between px-6 py-4",
-              !user && !loading && "pb-10"
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
-                <span className="text-slate-900 font-bold text-sm">P</span>
-              </div>
-              <span className="text-slate-50 font-bold text-lg">PoolPay</span>
-            </div>
-            <ProfileMenu
-              user={user}
-              displayName={profile?.fullName}
-              loading={loading}
-              onEditProfile={() => setProfileEditOpen(true)}
-            />
-          </div>
+          <AppHeader
+            user={user}
+            loading={loading}
+            displayName={profile?.fullName}
+            onEditProfile={() => setProfileEditOpen(true)}
+            onNavigate={handleNavigate}
+          />
         </div>
 
         {/* Main Content Area */}

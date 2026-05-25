@@ -42,8 +42,13 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
-const DEAL_FINDER_HELP =
-  "Pick a category, paste any booking or product URL — we rank wallet + circle cards with exact ₹ off, pay amount, T&C, and 50/50 split when pooling. Flights and hotels: enter trip details, pick a live fare, then see the best card and cards you could apply for bigger savings."
+const DEAL_FINDER_HELP_ITEMS = [
+  "Paste URL → best card + exact ₹ off & pay amount",
+  "Wallet + circle cards ranked with T&C",
+  "Pool with circle → 50/50 cashback split",
+  "Flights / hotels → route, fare, then best card",
+  "See cards to apply for bigger savings",
+] as const
 
 type DealSearchBarProps = {
   onNeedWallet?: () => void
@@ -242,9 +247,16 @@ export function DealSearchBar({
             side="bottom"
             align="start"
             sideOffset={6}
-            className="max-w-[min(100vw-2rem,320px)] border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs leading-relaxed text-slate-200 [&>svg]:fill-slate-900 [&>svg]:bg-slate-900"
+            className="max-w-[min(100vw-2rem,280px)] border border-slate-700 bg-slate-900 px-3 py-2.5 text-slate-200 [&>svg]:fill-slate-900 [&>svg]:bg-slate-900"
           >
-            {DEAL_FINDER_HELP}
+            <ul className="space-y-1.5 text-left text-[11px] leading-snug">
+              {DEAL_FINDER_HELP_ITEMS.map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span className="text-emerald-400">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
           </TooltipContent>
         </Tooltip>
 
