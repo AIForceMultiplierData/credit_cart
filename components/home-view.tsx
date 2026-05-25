@@ -61,17 +61,42 @@ function StatCard({
     label === "Saved" ? formatSaved(value) : value.toLocaleString("en-IN")
 
   return (
-    <div className="rounded-2xl border border-slate-800/50 bg-slate-900/60 p-3 text-center backdrop-blur-md">
-      <Icon className={cn("mx-auto mb-2 h-5 w-5", iconClassName)} />
+    <div className="flex aspect-square flex-col items-center justify-center rounded-2xl border border-slate-800/50 bg-slate-900/60 p-3 text-center backdrop-blur-md">
+      <Icon className={cn("mb-2 h-5 w-5", iconClassName)} />
       {loading ? (
         <>
-          <Skeleton className="mx-auto mb-2 h-7 w-10 bg-slate-800" />
-          <Skeleton className="mx-auto h-3 w-12 bg-slate-800/80" />
+          <Skeleton className="mb-2 h-7 w-10 bg-slate-800" />
+          <Skeleton className="h-3 w-12 bg-slate-800/80" />
         </>
       ) : (
         <>
           <p className="text-lg font-bold text-slate-50">{displayValue}</p>
           <p className="text-xs text-slate-500">{label}</p>
+        </>
+      )}
+    </div>
+  )
+}
+
+function WalletStatCard({
+  loading,
+  cardCount,
+}: {
+  loading: boolean
+  cardCount: number
+}) {
+  return (
+    <div className="flex aspect-square flex-col items-center justify-center rounded-2xl border border-slate-800/50 bg-slate-900/60 p-3 text-center backdrop-blur-md">
+      <CreditCard className="mb-2 h-5 w-5 text-blue-400" />
+      {loading ? (
+        <>
+          <Skeleton className="mb-2 h-7 w-8 bg-slate-800" />
+          <Skeleton className="h-3 w-16 bg-slate-800/80" />
+        </>
+      ) : (
+        <>
+          <p className="text-lg font-bold text-slate-50">{cardCount}</p>
+          <p className="text-xs text-slate-500">Wallet cards</p>
         </>
       )}
     </div>
@@ -158,7 +183,7 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
         onNeedSignIn={onSignIn}
       />
 
-      <div className="mb-6 grid grid-cols-3 gap-2">
+      <div className="mb-6 grid grid-cols-2 gap-2">
         <StatCard
           icon={TrendingUp}
           iconClassName="text-emerald-400"
@@ -180,20 +205,14 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
           value={stats.active_deals_count}
           label="Deals"
         />
-      </div>
-
-      <div className="mb-6 rounded-2xl border border-slate-800/50 bg-slate-900/60 p-4 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/15">
-            <CreditCard className="h-5 w-5 text-blue-400" />
-          </div>
-          <div>
-            <p className="font-semibold text-slate-50">Wallet cards</p>
-            <p className="text-sm text-slate-400">
-              {statsLoading ? "…" : `${cardCount} card${cardCount === 1 ? "" : "s"} added`}
-            </p>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => onNavigate("wallet")}
+          className="text-left transition-opacity hover:opacity-90 active:scale-[0.98]"
+          aria-label="Open wallet"
+        >
+          <WalletStatCard loading={statsLoading} cardCount={cardCount} />
+        </button>
       </div>
 
       <div className="space-y-3">

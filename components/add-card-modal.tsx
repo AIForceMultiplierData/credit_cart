@@ -5,7 +5,7 @@ import { ArrowLeft, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { BankLogo } from "@/components/bank-logo"
 import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
-import { resolveBankProfile } from "@/lib/bank-registry"
+import { BANK_REGISTRY, resolveBankProfile } from "@/lib/bank-registry"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -44,7 +44,14 @@ type BankOption = {
   bank_name: string
   bank_id: string
   bank_logo_url: string
-  style_classes: string
+  display_order: number
+}
+
+type CardBankRow = {
+  bank_id: string
+  bank_name: string
+  logo_url: string
+  display_order: number
 }
 
 type CardCatalogSelect = Partial<CardCatalogRow> & {
@@ -142,10 +149,16 @@ export function AddCardModal({
   onAddToWallet,
 }: AddCardModalProps) {
   const [catalogData, setCatalogData] = useState<CardCatalogRow[]>([])
+  const [bankOptions, setBankOptions] = useState<BankOption[]>([])
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
-  const [selectedBank, setSelectedBank] = useState<string | null>(null)
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<CardCatalogRow | null>(null)
+
+  const selectedBank = useMemo(() => {
+    if (!selectedBankId) return null
+    return bankOptions.find((b) => b.bank_id === selectedBankId) ?? null
+  }, [bankOptions, selectedBankId])
 
   useEffect(() => {
     let cancelled = false
@@ -161,10 +174,18 @@ export function AddCardModal({
         let data: CardCatalogSelect[] | null = null
         let error: { message: string } | null = null
 
-        const masterResult = await supabase
-          .from("card_catalog_master")
-          .select(masterSelect)
-          .returns<CardCatalogSelect[]>()
+        const [masterResult, banksResult] = await Promise.all([
+          supabase
+            .from("card_catalog_master")
+            .select(masterSelect)
+            .returns<CardCatalogSelect[]>(),
+          supabase
+            .from("card_banks")
+            .select("bank_id, bank_name, logo_url, display_order")
+            .eq("is_active", true)
+            .order("display_order", { ascending: true })
+            .returns<CardBankRow[]>(),
+        ])
 
         if (masterResult.error) {
           const fallback = await supabase
@@ -183,7 +204,28 @@ export function AddCardModal({
 
         if (cancelled) return
 
-        setCatalogData(parseCatalogRows(data ?? []))
+        const parsed = parseCatalogRows(data ?? [])
+        setCatalogData(parsed)
+
+        const banksFromDb = (banksResult.data ?? []).map((row) => ({
+          bank_id: row.bank_id,
+          bank_name: row.bank_name,
+          bank_logo_url: row.logo_url,
+          display_order: row.display_order,
+        }))
+
+        if (banksFromDb.length > 0) {
+          setBankOptions(banksFromDb)
+        } else {
+          setBankOptions(
+            BANK_REGISTRY.filter((b) => b.bank_id !== "default").map((b) => ({
+              bank_id: b.bank_id,
+              bank_name: b.bank_name,
+              bank_logo_url: b.logo_url,
+              display_order: b.display_order,
+            }))
+          )
+        }
       } catch (err) {
         if (cancelled) return
 
@@ -191,6 +233,7 @@ export function AddCardModal({
           err instanceof Error ? err.message : "Failed to load card catalog."
         setCatalogError(message)
         setCatalogData([])
+        setBankOptions([])
         toast.error("Catalog unavailable", { description: message })
       } finally {
         if (!cancelled) {
@@ -208,35 +251,19 @@ export function AddCardModal({
 
   useEffect(() => {
     if (!open) {
-      setSelectedBank(null)
+      setSelectedBankId(null)
       setSelectedCard(null)
     }
   }, [open])
 
-  const banks = useMemo(() => {
-    const map = new Map<string, BankOption>()
-
-    for (const row of catalogData) {
-      if (map.has(row.bank_name)) continue
-      const profile = resolveBankProfile(row.bank_name, row.bank_id)
-      map.set(row.bank_name, {
-        bank_name: row.bank_name,
-        bank_id: profile.bank_id,
-        bank_logo_url: row.bank_logo_url ?? profile.logo_url,
-        style_classes: profile.style_classes,
-      })
-    }
-
-    return [...map.values()].sort((a, b) => a.bank_name.localeCompare(b.bank_name))
-  }, [catalogData])
-
-  const bankCards = useMemo(
-    () =>
-      selectedBank
-        ? catalogData.filter((row) => row.bank_name === selectedBank)
-        : [],
-    [catalogData, selectedBank]
-  )
+  const bankCards = useMemo(() => {
+    if (!selectedBankId) return []
+    return catalogData.filter(
+      (row) =>
+        row.bank_id === selectedBankId ||
+        resolveBankProfile(row.bank_name, row.bank_id).bank_id === selectedBankId
+    )
+  }, [catalogData, selectedBankId])
 
   async function handleAddToWallet() {
     if (!selectedCard) return
@@ -263,21 +290,21 @@ export function AddCardModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-hidden border-slate-800 bg-slate-950/95 p-0 text-slate-50 backdrop-blur-xl sm:max-w-md">
+      <DialogContent className="flex max-h-[92vh] flex-col overflow-hidden border-slate-800 bg-slate-950/95 p-0 text-slate-50 backdrop-blur-xl sm:max-w-lg">
         <div className="border-b border-slate-800/80 bg-slate-900/60 px-5 py-4 backdrop-blur-md">
           <DialogHeader className="space-y-1 text-left">
             <DialogTitle className="text-lg font-bold text-slate-50">
-              {selectedBank ? "Choose your card" : "Select your bank"}
+              {selectedBankId ? "Choose your card" : "Select your bank"}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
               {selectedCard
                 ? "Confirm and add this card to your trusted circle wallet."
-                : selectedBank
-                  ? "Scroll and tap the card that matches your wallet."
-                  : "Pick a bank logo to browse the live card catalog."}
+                : selectedBankId
+                  ? `Cards from ${selectedBank?.bank_name ?? "this bank"}.`
+                  : "Pick a bank — logos from your live Supabase catalog."}
             </DialogDescription>
           </DialogHeader>
-          {selectedBank && (
+          {selectedBankId && (
             <Button
               type="button"
               variant="ghost"
@@ -285,7 +312,7 @@ export function AddCardModal({
               className="mt-3 -ml-2 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
               onClick={() => {
                 setSelectedCard(null)
-                setSelectedBank(null)
+                setSelectedBankId(null)
               }}
               disabled={saving || catalogLoading}
             >
@@ -295,9 +322,9 @@ export function AddCardModal({
           )}
         </div>
 
-        <div className="max-h-[55vh] overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {catalogLoading ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-slate-800/60 bg-slate-900/40 backdrop-blur-md">
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-xl border border-slate-800/60 bg-slate-900/40 backdrop-blur-md">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
               <p className="text-sm text-slate-400">Loading card catalog…</p>
             </div>
@@ -314,27 +341,43 @@ export function AddCardModal({
                 catalog sync.
               </p>
             </div>
-          ) : !selectedBank ? (
-            <div className="grid grid-cols-2 gap-3">
-              {banks.map((bank) => (
-                <button
-                  key={bank.bank_name}
-                  type="button"
-                  onClick={() => setSelectedBank(bank.bank_name)}
-                  className={cn(
-                    "flex h-20 flex-col items-center justify-center gap-2 rounded-xl border border-white/10 p-3 shadow-md transition-transform active:scale-[0.98]",
-                    bank.style_classes
-                  )}
-                >
-                  <BankLogo
-                    bankName={bank.bank_name}
-                    bankId={bank.bank_id}
-                    logoUrl={bank.bank_logo_url}
-                    className="h-6 max-w-[5rem]"
-                    imageClassName="h-6 w-auto max-w-[5rem]"
-                  />
-                </button>
-              ))}
+          ) : !selectedBankId ? (
+            bankOptions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
+                <p className="font-medium text-slate-300">No banks in catalog yet</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Run card_catalog_master.sql and the 6 AM sync, then reopen.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {bankOptions.map((bank) => (
+                  <button
+                    key={bank.bank_id}
+                    type="button"
+                    onClick={() => setSelectedBankId(bank.bank_id)}
+                    className={cn(
+                      "flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/40 p-3 transition-all",
+                      "hover:border-slate-500 hover:bg-slate-800/50 active:scale-[0.98]"
+                    )}
+                  >
+                    <BankLogo
+                      bankName={bank.bank_name}
+                      bankId={bank.bank_id}
+                      logoUrl={bank.bank_logo_url}
+                      className="flex h-11 w-full items-center justify-center"
+                      imageClassName="h-11 w-auto max-h-11 max-w-[4.5rem] object-contain"
+                    />
+                    <span className="line-clamp-1 text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                      {bank.bank_name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : bankCards.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">
+              No cards listed for this bank yet.
             </div>
           ) : (
             <div className="flex flex-col gap-4">
