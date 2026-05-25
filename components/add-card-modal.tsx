@@ -223,14 +223,22 @@ export function AddCardModal({
         if (cancelled) return
 
         const parsed = parseCatalogRows(data ?? [])
+        const fallbackRows = staticFallback.map(enrichCatalogRow)
         if (parsed.length > 0) {
           setCatalogData(parsed)
+          setCatalogError(null)
         } else {
-          setCatalogData(staticFallback.map(enrichCatalogRow))
-          if (error) {
+          setCatalogData(fallbackRows)
+          if (error && fallbackRows.length > 0) {
             setCatalogError(
               "Using built-in catalog — run card_catalog_master.sql in Supabase for live sync."
             )
+          } else if (error) {
+            setCatalogError(
+              "Catalog unavailable. Run card_catalog_master.sql in Supabase for live sync."
+            )
+          } else {
+            setCatalogError(null)
           }
         }
 
@@ -247,11 +255,13 @@ export function AddCardModal({
 
         const message =
           err instanceof Error ? err.message : "Failed to load card catalog."
-        setCatalogError(
-          `${message} Showing built-in banks and cards until Supabase catalog is ready.`
-        )
         setCatalogData(staticFallback.map(enrichCatalogRow))
         setBankOptions(staticBanks)
+        setCatalogError(
+          staticFallback.length > 0 || staticBanks.length > 0
+            ? "Using built-in catalog — run card_catalog_master.sql in Supabase for live sync."
+            : `${message} Run card_catalog_master.sql in Supabase.`
+        )
       } finally {
         if (!cancelled) {
           setCatalogLoading(false)
@@ -346,68 +356,72 @@ export function AddCardModal({
               <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
               <p className="text-sm text-slate-400">Loading card catalog…</p>
             </div>
-          ) : catalogError ? (
+          ) : catalogData.length === 0 && bankOptions.length === 0 ? (
             <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-6 text-center backdrop-blur-md">
               <p className="font-medium text-red-300">Could not load catalog</p>
-              <p className="mt-1 text-sm text-slate-400">{catalogError}</p>
-            </div>
-          ) : catalogData.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center backdrop-blur-md">
-              <p className="font-medium text-slate-300">No cards available</p>
-              <p className="mt-1 text-sm text-slate-500">
-                Run card_catalog_master.sql in Supabase, then wait for the 6 AM
-                catalog sync.
+              <p className="mt-1 text-sm text-slate-400">
+                {catalogError ??
+                  "Run card_catalog_master.sql in Supabase, then wait for the 6 AM catalog sync."}
               </p>
             </div>
-          ) : !selectedBankId ? (
-            bankOptions.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
-                <p className="font-medium text-slate-300">No banks in catalog yet</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Run card_catalog_master.sql and the 6 AM sync, then reopen.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-3">
-                {bankOptions.map((bank) => (
-                  <button
-                    key={bank.bank_id}
-                    type="button"
-                    onClick={() => setSelectedBankId(bank.bank_id)}
-                    className={cn(
-                      "flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/40 p-3 transition-all",
-                      "hover:border-slate-500 hover:bg-slate-800/50 active:scale-[0.98]"
-                    )}
-                  >
-                    <BankLogo
-                      bankName={bank.bank_name}
-                      bankId={bank.bank_id}
-                      logoUrl={bank.bank_logo_url}
-                      className="flex h-11 w-full items-center justify-center"
-                      imageClassName="h-11 w-auto max-h-11 max-w-[4.5rem] object-contain"
-                    />
-                    <span className="line-clamp-1 text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      {bank.bank_name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )
-          ) : bankCards.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">
-              No cards listed for this bank yet.
-            </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {bankCards.map((card) => (
-                <CatalogCardPreview
-                  key={card.card_id}
-                  card={card}
-                  selected={selectedCard?.card_id === card.card_id}
-                  onSelect={() => setSelectedCard(card)}
-                />
-              ))}
-            </div>
+            <>
+              {catalogError ? (
+                <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-950/20 px-4 py-3 text-center backdrop-blur-md">
+                  <p className="text-sm text-amber-200/90">{catalogError}</p>
+                </div>
+              ) : null}
+              {!selectedBankId ? (
+                bankOptions.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
+                    <p className="font-medium text-slate-300">No banks in catalog yet</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Run card_catalog_master.sql and the 6 AM sync, then reopen.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {bankOptions.map((bank) => (
+                      <button
+                        key={bank.bank_id}
+                        type="button"
+                        onClick={() => setSelectedBankId(bank.bank_id)}
+                        className={cn(
+                          "flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/40 p-3 transition-all",
+                          "hover:border-slate-500 hover:bg-slate-800/50 active:scale-[0.98]"
+                        )}
+                      >
+                        <BankLogo
+                          bankName={bank.bank_name}
+                          bankId={bank.bank_id}
+                          logoUrl={bank.bank_logo_url}
+                          className="flex h-11 w-full items-center justify-center"
+                          imageClassName="h-11 w-auto max-h-11 max-w-[4.5rem] object-contain"
+                        />
+                        <span className="line-clamp-1 text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                          {bank.bank_name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              ) : bankCards.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">
+                  No cards listed for this bank yet.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {bankCards.map((card) => (
+                    <CatalogCardPreview
+                      key={card.card_id}
+                      card={card}
+                      selected={selectedCard?.card_id === card.card_id}
+                      onSelect={() => setSelectedCard(card)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
