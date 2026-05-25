@@ -194,8 +194,8 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
         <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-6 text-center">
           <p className="font-medium text-slate-300">No outside-wallet deals</p>
           <p className="mt-1 text-sm text-slate-500">
-            Either Serper returned no products, or every viral pick already
-            matches a card in your wallet.
+            {summary ||
+              "Either Serper returned no products, or no outside-wallet card beat your wallet for these picks."}
           </p>
         </div>
       ) : (

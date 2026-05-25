@@ -60,7 +60,11 @@ export function BankLogo({
       loading="lazy"
       decoding="async"
       onError={() => setFailed(true)}
-      className={cn("object-contain", className, imageClassName)}
+      className={cn(
+        "object-contain object-left",
+        className,
+        imageClassName
+      )}
     />
   )
 }

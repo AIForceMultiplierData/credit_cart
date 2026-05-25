@@ -124,6 +124,8 @@ export function buildMissingCardTeasers(input: {
   offers: DealOffer[]
   serper: SerperDealContext
   walletBestAmount?: number
+  /** When true, still surface cards tied with wallet on ₹ savings (Deals feed). */
+  allowEqualToWallet?: boolean
   limit?: number
 }): MissingCardTeaser[] {
   const { url, estimatedPrice, searchCards, offers, serper } = input
@@ -171,8 +173,11 @@ export function buildMissingCardTeasers(input: {
       continue
     }
 
-    if (estimatedPrice !== null && discountAmount <= walletBestAmount) {
-      continue
+    if (estimatedPrice !== null) {
+      const losesToWallet = input.allowEqualToWallet
+        ? discountAmount < walletBestAmount
+        : discountAmount <= walletBestAmount
+      if (losesToWallet) continue
     }
 
     const inCircle = circleByCardId.has(catalog.card_id)

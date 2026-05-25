@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { ArrowLeft, Loader2 } from "lucide-react"
-import { toast } from "sonner"
 import { BankLogo } from "@/components/bank-logo"
 import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
 import { getCardArtUrl } from "@/lib/card-art-registry"
+import { catalogRowsFromStaticCatalog } from "@/lib/enrich-wallet-card"
 import { BANK_REGISTRY, resolveBankProfile } from "@/lib/bank-registry"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
@@ -82,7 +82,7 @@ function enrichCatalogRow(row: CardCatalogSelect): CardCatalogRow {
     network: row.network ?? null,
     card_tier: row.card_tier ?? null,
     apply_url: row.apply_url ?? null,
-    is_active: row.is_active,
+    is_active: row.is_active !== false,
   }
 }
 
@@ -97,8 +97,7 @@ function parseCatalogRows(raw: unknown): CardCatalogRow[] {
         typeof item.card_id === "string" &&
         typeof item.bank_name === "string" &&
         typeof item.card_name === "string" &&
-        typeof item.style_classes === "string" &&
-        typeof item.is_active === "boolean"
+        typeof item.style_classes === "string"
       )
     })
     .map(enrichCatalogRow)
@@ -170,6 +169,8 @@ export function AddCardModal({
   }, [bankOptions, selectedBankId])
 
   useEffect(() => {
+    if (!open) return
+
     let cancelled = false
 
     async function fetchCatalog() {
@@ -178,6 +179,16 @@ export function AddCardModal({
 
       const masterSelect =
         "card_id, bank_id, bank_name, bank_logo_url, card_image_url, card_name, style_classes, network, card_tier, apply_url, is_active"
+
+      const staticFallback = catalogRowsFromStaticCatalog()
+      const staticBanks = BANK_REGISTRY.filter((b) => b.bank_id !== "default").map(
+        (b) => ({
+          bank_id: b.bank_id,
+          bank_name: b.bank_name,
+          bank_logo_url: b.logo_url,
+          display_order: b.display_order,
+        })
+      )
 
       try {
         let data: CardCatalogSelect[] | null = null
@@ -209,12 +220,19 @@ export function AddCardModal({
           data = masterResult.data
         }
 
-        if (error) throw error
-
         if (cancelled) return
 
         const parsed = parseCatalogRows(data ?? [])
-        setCatalogData(parsed)
+        if (parsed.length > 0) {
+          setCatalogData(parsed)
+        } else {
+          setCatalogData(staticFallback.map(enrichCatalogRow))
+          if (error) {
+            setCatalogError(
+              "Using built-in catalog — run card_catalog_master.sql in Supabase for live sync."
+            )
+          }
+        }
 
         const banksFromDb = (banksResult.data ?? []).map((row) => ({
           bank_id: row.bank_id,
@@ -223,27 +241,17 @@ export function AddCardModal({
           display_order: row.display_order,
         }))
 
-        if (banksFromDb.length > 0) {
-          setBankOptions(banksFromDb)
-        } else {
-          setBankOptions(
-            BANK_REGISTRY.filter((b) => b.bank_id !== "default").map((b) => ({
-              bank_id: b.bank_id,
-              bank_name: b.bank_name,
-              bank_logo_url: b.logo_url,
-              display_order: b.display_order,
-            }))
-          )
-        }
+        setBankOptions(banksFromDb.length > 0 ? banksFromDb : staticBanks)
       } catch (err) {
         if (cancelled) return
 
         const message =
           err instanceof Error ? err.message : "Failed to load card catalog."
-        setCatalogError(message)
-        setCatalogData([])
-        setBankOptions([])
-        toast.error("Catalog unavailable", { description: message })
+        setCatalogError(
+          `${message} Showing built-in banks and cards until Supabase catalog is ready.`
+        )
+        setCatalogData(staticFallback.map(enrichCatalogRow))
+        setBankOptions(staticBanks)
       } finally {
         if (!cancelled) {
           setCatalogLoading(false)
@@ -256,7 +264,7 @@ export function AddCardModal({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [open])
 
   useEffect(() => {
     if (!open) {

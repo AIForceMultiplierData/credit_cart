@@ -20,6 +20,7 @@ import {
 } from "@/components/wallet-card-lending-toggle"
 import { useAuth } from "@/hooks/useAuth"
 import { supabase } from "@/lib/supabase"
+import { enrichWalletCards } from "@/lib/enrich-wallet-card"
 import {
   countLendingActiveCards,
   parseWalletCards,
@@ -83,7 +84,7 @@ export function WalletView() {
 
       if (error) throw error
 
-      setCards(parseWalletCards(data ?? []))
+      setCards(enrichWalletCards(parseWalletCards(data ?? [])))
     } catch (err) {
       const message = getSupabaseErrorMessage(
         err,
@@ -128,7 +129,7 @@ export function WalletView() {
 
       if (error) throw error
 
-      setCards(parseWalletCards(data ?? payload))
+      setCards(enrichWalletCards(parseWalletCards(data ?? payload)))
       toast.success(options?.toastMessage ?? "Wallet updated", {
         description:
           options?.toastDescription ??

@@ -88,6 +88,7 @@ function pickBestDealForProduct(
     offers: [],
     serper,
     walletBestAmount,
+    allowEqualToWallet: true,
     limit: 1,
   })
 
@@ -133,9 +134,10 @@ export async function fetchViralDeals(
   if (rawProducts.length === 0) {
     return {
       deals: [],
-      used_serper: false,
+      used_serper: true,
       wallet_excluded_count: walletExcluded,
-      summary: "No live viral products found right now. Try again shortly.",
+      summary:
+        "Serper returned no priced products. Check SERPER_KEYS on Vercel or try Refresh.",
     }
   }
 
@@ -153,7 +155,32 @@ export async function fetchViralDeals(
   for (const product of rawProducts) {
     if (deals.length >= limit) break
 
-    const deal = pickBestDealForProduct(product, searchCards, serperByPlatform)
+    let deal = pickBestDealForProduct(product, searchCards, serperByPlatform)
+
+    if (!deal) {
+      const teasers = buildMissingCardTeasers({
+        url: productUrlForPlatform(product.platform, product.url),
+        estimatedPrice: product.price,
+        searchCards,
+        offers: [],
+        serper:
+          serperByPlatform.get(product.platform) ??
+          ({
+            used_serper: false,
+            price: product.price,
+            product_snippets: [],
+            card_offer_snippets: [],
+            shopping_results: [],
+            queries_run: [],
+          } satisfies SerperDealContext),
+        walletBestAmount: 0,
+        allowEqualToWallet: true,
+        limit: 1,
+      })
+      const best = teasers[0]
+      if (best) deal = missingTeaserToViralDeal(product, best)
+    }
+
     if (deal) {
       deals.push(deal)
     }
@@ -169,6 +196,6 @@ export async function fetchViralDeals(
     summary:
       deals.length > 0
         ? `${deals.length} live deal${deals.length === 1 ? "" : "s"} outside your circle.`
-        : "All viral picks match cards already in your wallet. Add more platforms or cards.",
+        : "No stronger outside-wallet card for these picks. Try Refresh or add a different platform card.",
   }
 }

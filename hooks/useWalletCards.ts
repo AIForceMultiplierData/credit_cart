@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import type { WalletCardRecord } from "@/components/add-card-modal"
+import { enrichWalletCards } from "@/lib/enrich-wallet-card"
 import { parseWalletCards } from "@/lib/wallet-cards"
 import { supabase } from "@/lib/supabase"
 
@@ -27,9 +28,9 @@ export function useWalletCards(userId: string | undefined) {
         .eq("id", userId)
         .maybeSingle()
 
-      setCards(parseWalletCards(profile?.cards))
+      setCards(enrichWalletCards(parseWalletCards(profile?.cards)))
     } else {
-      setCards(parseWalletCards(data))
+      setCards(enrichWalletCards(parseWalletCards(data)))
     }
 
     setLoading(false)
