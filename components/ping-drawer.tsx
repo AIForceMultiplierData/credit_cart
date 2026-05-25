@@ -21,6 +21,10 @@ import {
 } from "@/components/ui/sheet"
 import { useAuth } from "@/hooks/useAuth"
 import { useProfile } from "@/hooks/useProfile"
+import {
+  computePoolPingBreakdown,
+  formatPoolInr,
+} from "@/lib/pool-ping-breakdown"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
@@ -120,7 +124,7 @@ export function PingDrawer({ deal, open, onOpenChange }: PingDrawerProps) {
 
   const basePrice = deal.originalPrice
   const cardDiscount = deal.cardDiscount
-  const finalEscrow = deal.discountedPrice
+  const pool = computePoolPingBreakdown(basePrice, cardDiscount)
   const isProcessing = pingState === "processing"
   const isSent = pingState === "sent"
 
@@ -156,10 +160,10 @@ export function PingDrawer({ deal, open, onOpenChange }: PingDrawerProps) {
               </p>
             </div>
 
-            <div className="space-y-4 font-mono text-sm">
+            <div className="space-y-3 font-mono text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Base Price</span>
-                <span className="text-slate-50">₹{basePrice.toLocaleString("en-IN")}</span>
+                <span className="text-slate-50">{formatPoolInr(pool.base_price)}</span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -168,7 +172,28 @@ export function PingDrawer({ deal, open, onOpenChange }: PingDrawerProps) {
                   <span className="text-slate-400">Card Discount</span>
                 </div>
                 <span className="font-medium text-emerald-400">
-                  -₹{cardDiscount.toLocaleString("en-IN")}
+                  -{formatPoolInr(pool.card_discount)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Your benefit (50% of cashback)</span>
+                <span className="text-emerald-300">
+                  -{formatPoolInr(pool.your_benefit)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Buddy benefit (50% of cashback)</span>
+                <span className="text-violet-300">
+                  {formatPoolInr(pool.buddy_benefit)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Platform fee</span>
+                <span className="text-amber-300">
+                  +{formatPoolInr(pool.platform_fee)}
                 </span>
               </div>
 
@@ -176,10 +201,12 @@ export function PingDrawer({ deal, open, onOpenChange }: PingDrawerProps) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-blue-400" />
-                    <span className="font-semibold text-slate-50">Final Escrow</span>
+                    <span className="font-semibold text-slate-50">
+                      Total amount to pay now
+                    </span>
                   </div>
                   <span className="text-2xl font-bold text-slate-50">
-                    ₹{finalEscrow.toLocaleString("en-IN")}
+                    {formatPoolInr(pool.total_pay_now)}
                   </span>
                 </div>
               </div>
@@ -253,58 +280,60 @@ export function PingDrawer({ deal, open, onOpenChange }: PingDrawerProps) {
             </div>
           ) : null}
 
-          <motion.button
-            type="button"
-            disabled={isProcessing || isSent || authLoading}
-            whileTap={{ scale: isProcessing || isSent ? 1 : 0.96 }}
-            animate={
-              isProcessing
-                ? {
-                    scale: [1, 0.97, 1.03, 1],
-                    boxShadow: [
-                      "0 0 24px rgba(52,211,153,0.35)",
-                      "0 0 48px rgba(52,211,153,0.85)",
-                      "0 0 24px rgba(52,211,153,0.35)",
-                    ],
-                  }
-                : isSent
+          <div className="flex justify-center">
+            <motion.button
+              type="button"
+              disabled={isProcessing || isSent || authLoading}
+              whileTap={{ scale: isProcessing || isSent ? 1 : 0.96 }}
+              animate={
+                isProcessing
                   ? {
-                      boxShadow: "0 0 28px rgba(52,211,153,0.45)",
+                      scale: [1, 0.97, 1.03, 1],
+                      boxShadow: [
+                        "0 0 24px rgba(52,211,153,0.35)",
+                        "0 0 48px rgba(52,211,153,0.85)",
+                        "0 0 24px rgba(52,211,153,0.35)",
+                      ],
                     }
-                  : {
-                      boxShadow: "0 0 30px rgba(52,211,153,0.4)",
-                    }
-            }
-            transition={
-              isProcessing
-                ? { duration: 0.9, repeat: Infinity, ease: "easeInOut" }
-                : { duration: 0.25 }
-            }
-            onClick={() => void handlePingCircle(mapDealToPingData(deal))}
-            className={cn(
-              "flex h-16 w-full items-center justify-center rounded-2xl border-0",
-              "bg-emerald-400 text-lg font-bold text-slate-900",
-              "transition-colors hover:bg-emerald-300",
-              "disabled:cursor-not-allowed disabled:opacity-70"
-            )}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Pinging Circle…
-              </>
-            ) : isSent ? (
-              <>
-                <Radio className="mr-2 h-5 w-5" />
-                Ping Sent
-              </>
-            ) : (
-              <>
-                <Send className="mr-2 h-5 w-5" />
-                Ping Circle
-              </>
-            )}
-          </motion.button>
+                  : isSent
+                    ? {
+                        boxShadow: "0 0 28px rgba(52,211,153,0.45)",
+                      }
+                    : {
+                        boxShadow: "0 0 30px rgba(52,211,153,0.4)",
+                      }
+              }
+              transition={
+                isProcessing
+                  ? { duration: 0.9, repeat: Infinity, ease: "easeInOut" }
+                  : { duration: 0.25 }
+              }
+              onClick={() => void handlePingCircle(mapDealToPingData(deal))}
+              className={cn(
+                "flex h-14 min-w-[220px] max-w-sm items-center justify-center rounded-2xl border-0 px-10",
+                "bg-emerald-400 text-base font-bold text-slate-900",
+                "transition-colors hover:bg-emerald-300",
+                "disabled:cursor-not-allowed disabled:opacity-70"
+              )}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Pinging Circle…
+                </>
+              ) : isSent ? (
+                <>
+                  <Radio className="mr-2 h-5 w-5" />
+                  Ping Sent
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-5 w-5" />
+                  Ping Circle
+                </>
+              )}
+            </motion.button>
+          </div>
 
           <p className="mt-4 text-center text-xs text-slate-500">
             Protected by PoolPay Escrow. Funds release only on delivery confirmation.

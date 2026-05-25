@@ -157,7 +157,7 @@ export async function fetchViralDeals(
     wallet_excluded_count: walletExcluded,
     summary:
       deals.length > 0
-        ? `${deals.length} deals with cards outside your wallet — pool for 50% cashback split.`
+        ? `${deals.length} live deal${deals.length === 1 ? "" : "s"} outside your circle.`
         : "All viral picks match cards already in your wallet. Add more platforms or cards.",
   }
 }

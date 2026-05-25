@@ -141,18 +141,11 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
           ) : null}
         </div>
         <h1 className="text-balance text-2xl font-bold text-slate-50">
-          Cashback outside your wallet
+          Deals Outside Circle
         </h1>
-        <p className="mt-1 text-sm leading-relaxed text-slate-400">
-          Best card for each trending product on Amazon, Flipkart &amp; eBay —
-          only cards <strong className="text-slate-300">not in your wallet</strong>.
-          Pool with circle for a{" "}
-          <strong className="text-emerald-300">50% cashback split</strong>, or
-          apply for your own card.
+        <p className="mt-1 text-sm font-medium text-emerald-300/90">
+          Available at 50/50 Split
         </p>
-        {summary ? (
-          <p className="mt-2 text-xs text-slate-500">{summary}</p>
-        ) : null}
       </div>
 
       <div className="mb-4 flex justify-end">

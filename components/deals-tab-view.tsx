@@ -30,8 +30,8 @@ const MODES: Array<{
   },
   {
     id: "hot-deals",
-    label: "Hot deals live",
-    shortLabel: "Hot deals",
+    label: "Live Deals",
+    shortLabel: "Live",
     icon: Zap,
     activeClass:
       "bg-emerald-500/20 text-emerald-200 shadow-sm shadow-emerald-500/10",
