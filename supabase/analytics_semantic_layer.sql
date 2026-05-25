@@ -121,36 +121,133 @@ select
   date(c.created_at) as created_date_key
 from public.contracts c;
 
--- ── fact_transactions ────────────────────────────────────────────────────────
-create or replace view analytics.fact_transactions as
-select
-  t.id as transaction_id,
-  t.contract_id,
-  t.buyer_id,
-  t.transaction_type,
-  t.status,
-  t.amount,
-  t.created_at,
-  date(t.created_at) as created_date_key
-from public.transactions t;
+-- ── fact_transactions / leads / fulfillment (schema-tolerant PK columns) ───
+do $$
+declare
+  txn_pk text;
+  lead_pk text;
+  fulfill_pk text;
+begin
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'transactions'
+  ) then
+    select column_name into txn_pk
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'transactions'
+      and column_name in ('id', 'transaction_id')
+    order by case column_name when 'id' then 1 else 2 end
+    limit 1;
 
--- ── fact_credit_card_leads ───────────────────────────────────────────────────
-create or replace view analytics.fact_credit_card_leads as
-select
-  l.id as lead_id,
-  l.user_id,
-  l.card_id,
-  l.bank_name,
-  l.card_name,
-  l.source,
-  l.status,
-  l.employment_type,
-  l.monthly_in_hand_salary,
-  l.created_at,
-  date(l.created_at) as created_date_key
-from public.credit_card_leads l;
+    if txn_pk is not null then
+      execute format(
+        $sql$
+        create or replace view analytics.fact_transactions as
+        select
+          t.%1$I as transaction_id,
+          t.contract_id,
+          t.buyer_id,
+          t.transaction_type,
+          t.status,
+          t.amount,
+          t.created_at,
+          date(t.created_at) as created_date_key
+        from public.transactions t
+        $sql$,
+        txn_pk
+      );
+    else
+      execute $sql$
+        create or replace view analytics.fact_transactions as
+        select
+          md5(
+            coalesce(t.contract_id::text, '')
+              || '|' || coalesce(t.buyer_id::text, '')
+              || '|' || coalesce(t.transaction_type, '')
+              || '|' || coalesce(t.status, '')
+              || '|' || coalesce(t.amount::text, '')
+              || '|' || coalesce(t.created_at::text, '')
+          )::uuid as transaction_id,
+          t.contract_id,
+          t.buyer_id,
+          t.transaction_type,
+          t.status,
+          t.amount,
+          t.created_at,
+          date(t.created_at) as created_date_key
+        from public.transactions t
+      $sql$;
+    end if;
+  end if;
 
--- ── fact_disputes / fact_fulfillment ─────────────────────────────────────────
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'credit_card_leads'
+  ) then
+    select column_name into lead_pk
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'credit_card_leads'
+      and column_name in ('id', 'lead_id')
+    order by case column_name when 'id' then 1 else 2 end
+    limit 1;
+
+    if lead_pk is not null then
+      execute format(
+        $sql$
+        create or replace view analytics.fact_credit_card_leads as
+        select
+          l.%1$I as lead_id,
+          l.user_id,
+          l.card_id,
+          l.bank_name,
+          l.card_name,
+          l.source,
+          l.status,
+          l.employment_type,
+          l.monthly_in_hand_salary,
+          l.created_at,
+          date(l.created_at) as created_date_key
+        from public.credit_card_leads l
+        $sql$,
+        lead_pk
+      );
+    end if;
+  end if;
+
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'fulfillment_logs'
+  ) then
+    select column_name into fulfill_pk
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'fulfillment_logs'
+      and column_name in ('id', 'fulfillment_id')
+    order by case column_name when 'id' then 1 else 2 end
+    limit 1;
+
+    if fulfill_pk is not null then
+      execute format(
+        $sql$
+        create or replace view analytics.fact_fulfillment as
+        select
+          f.%1$I as fulfillment_id,
+          f.contract_id,
+          f.placed_by,
+          f.tracking_number,
+          f.created_at,
+          date(f.created_at) as created_date_key
+        from public.fulfillment_logs f
+        $sql$,
+        fulfill_pk
+      );
+    end if;
+  end if;
+end $$;
+
+-- ── fact_disputes ────────────────────────────────────────────────────────────
 create or replace view analytics.fact_disputes as
 select
   d.dispute_id,
@@ -162,15 +259,7 @@ select
   date(d.created_at) as created_date_key
 from public.disputes d;
 
-create or replace view analytics.fact_fulfillment as
-select
-  f.id as fulfillment_id,
-  f.contract_id,
-  f.placed_by,
-  f.tracking_number,
-  f.created_at,
-  date(f.created_at) as created_date_key
-from public.fulfillment_logs f;
+-- fact_fulfillment created in schema-tolerant block above (if table exists)
 
 -- ── Funnel rollups ───────────────────────────────────────────────────────────
 create or replace view analytics.v_user_funnel as

@@ -27,6 +27,11 @@ After step 1 succeeds, run:
 
 `supabase/analytics_semantic_layer.sql`
 
+If you still see `column t.id does not exist` on transactions, either:
+
+- Re-run the updated analytics script (it auto-detects `id` vs `transaction_id`), or
+- Run `supabase/transactions_schema_repair.sql` then analytics again.
+
 ### 3. Verify
 
 ```sql
