@@ -238,3 +238,15 @@ order by created_date_key desc;
 revoke all on schema analytics from public;
 grant usage on schema analytics to service_role;
 grant select on all tables in schema analytics to service_role;
+
+do $$
+declare r record;
+begin
+  for r in
+    select table_name
+    from information_schema.views
+    where table_schema = 'analytics'
+  loop
+    execute format('grant select on analytics.%I to service_role', r.table_name);
+  end loop;
+end $$;
