@@ -3,7 +3,7 @@
 -- Regenerate: node scripts/generate-card-catalog-master.mjs
 --
 -- Combines (in order):
---   1. supabase/card_catalog.sql         — base table + legacy seed
+--   1. supabase/card_catalog.sql         — base table (legacy seed only if card_id is text)
 --   2. supabase/card_catalog_master.sql  — card_banks, columns, view
 --   3. supabase/card_catalog_live_seed.sql — 230 live cards upsert
 --
@@ -16,7 +16,8 @@
 -- Source: supabase/card_catalog.sql
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- PoolPay card catalog (run in Supabase SQL Editor after profiles.sql)
+-- PoolPay card catalog base (run after profiles.sql)
+-- Legacy text-slug seed runs ONLY when card_id is text (skipped when card_id is uuid).
 
 create table if not exists public.card_catalog (
   card_id text primary key,
@@ -34,32 +35,46 @@ create policy "Anyone can read active card catalog"
   on public.card_catalog for select
   using (is_active = true);
 
-insert into public.card_catalog (card_id, bank_name, card_name, style_classes) values
-  ('hdfc_millennia', 'HDFC', 'Millennia', 'bg-gradient-to-br from-blue-900 to-slate-900 text-blue-100'),
-  ('hdfc_regalia', 'HDFC', 'Regalia Gold', 'bg-gradient-to-br from-yellow-700 to-amber-950 text-yellow-100'),
-  ('hdfc_diners', 'HDFC', 'Diners Club Black', 'bg-gradient-to-br from-zinc-900 to-black text-slate-300'),
-  ('hdfc_swiggy', 'HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white'),
-  ('hdfc_freedom', 'HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white'),
-  ('hdfc_bizgrow', 'HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100'),
-  ('hdfc_iocl', 'HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100'),
-  ('hdfc_irctc', 'HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100'),
-  ('hdfc_pixel_play', 'HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100'),
-  ('sbi_elite', 'SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white'),
-  ('sbi_prime', 'SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white'),
-  ('sbi_cashback', 'SBI', 'Cashback Card', 'bg-gradient-to-br from-cyan-500 to-blue-700 text-white'),
-  ('sbi_simplyclick', 'SBI', 'SimplyCLICK', 'bg-gradient-to-br from-teal-400 to-emerald-700 text-white'),
-  ('icici_amazon', 'ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100'),
-  ('icici_sapphiro', 'ICICI', 'Sapphiro', 'bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200'),
-  ('icici_coral', 'ICICI', 'Coral', 'bg-gradient-to-br from-orange-700 to-red-950 text-orange-100'),
-  ('icici_emeralde', 'ICICI', 'Emeralde', 'bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100'),
-  ('icici_rubyx', 'ICICI', 'Rubyx', 'bg-gradient-to-br from-red-800 to-rose-950 text-red-100'),
-  ('axis_flipkart', 'AXIS', 'Flipkart Axis', 'bg-gradient-to-br from-purple-700 to-fuchsia-900 text-white'),
-  ('axis_magnus', 'AXIS', 'Magnus', 'bg-gradient-to-br from-zinc-800 to-red-950 text-red-100')
-on conflict (card_id) do update set
-  bank_name = excluded.bank_name,
-  card_name = excluded.card_name,
-  style_classes = excluded.style_classes,
-  is_active = true;
+-- Skip on UUID PK — use card_catalog_live_seed.sql / card_catalog_full_setup.sql instead.
+do $$
+declare
+  card_id_type text;
+begin
+  select c.data_type into card_id_type
+  from information_schema.columns c
+  where c.table_schema = 'public'
+    and c.table_name = 'card_catalog'
+    and c.column_name = 'card_id';
+
+  if card_id_type is distinct from 'uuid' then
+    insert into public.card_catalog (card_id, bank_name, card_name, style_classes) values
+      ('hdfc_millennia', 'HDFC', 'Millennia', 'bg-gradient-to-br from-blue-900 to-slate-900 text-blue-100'),
+      ('hdfc_regalia', 'HDFC', 'Regalia Gold', 'bg-gradient-to-br from-yellow-700 to-amber-950 text-yellow-100'),
+      ('hdfc_diners', 'HDFC', 'Diners Club Black', 'bg-gradient-to-br from-zinc-900 to-black text-slate-300'),
+      ('hdfc_swiggy', 'HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white'),
+      ('hdfc_freedom', 'HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white'),
+      ('hdfc_bizgrow', 'HDFC', 'BizGrow', 'bg-gradient-to-br from-blue-900 to-indigo-950 text-blue-100'),
+      ('hdfc_iocl', 'HDFC', 'IndianOil', 'bg-gradient-to-br from-amber-700 to-orange-950 text-amber-100'),
+      ('hdfc_irctc', 'HDFC', 'IRCTC', 'bg-gradient-to-br from-sky-700 to-blue-950 text-sky-100'),
+      ('hdfc_pixel_play', 'HDFC', 'Pixel Play', 'bg-gradient-to-br from-cyan-600 to-blue-900 text-cyan-100'),
+      ('sbi_elite', 'SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white'),
+      ('sbi_prime', 'SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white'),
+      ('sbi_cashback', 'SBI', 'Cashback Card', 'bg-gradient-to-br from-cyan-500 to-blue-700 text-white'),
+      ('sbi_simplyclick', 'SBI', 'SimplyCLICK', 'bg-gradient-to-br from-teal-400 to-emerald-700 text-white'),
+      ('icici_amazon', 'ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100'),
+      ('icici_sapphiro', 'ICICI', 'Sapphiro', 'bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200'),
+      ('icici_coral', 'ICICI', 'Coral', 'bg-gradient-to-br from-orange-700 to-red-950 text-orange-100'),
+      ('icici_emeralde', 'ICICI', 'Emeralde', 'bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100'),
+      ('icici_rubyx', 'ICICI', 'Rubyx', 'bg-gradient-to-br from-red-800 to-rose-950 text-red-100'),
+      ('axis_flipkart', 'AXIS', 'Flipkart Axis', 'bg-gradient-to-br from-purple-700 to-fuchsia-900 text-white'),
+      ('axis_magnus', 'AXIS', 'Magnus', 'bg-gradient-to-br from-zinc-800 to-red-950 text-red-100')
+    on conflict (card_id) do update set
+      bank_name = excluded.bank_name,
+      card_name = excluded.card_name,
+      style_classes = excluded.style_classes,
+      is_active = true;
+  end if;
+end $$;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════

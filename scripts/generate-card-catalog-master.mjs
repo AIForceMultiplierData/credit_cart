@@ -422,7 +422,7 @@ const bundleHeader = `-- PoolPay CARD CATALOG — single-run bundle (AUTO-GENERA
 -- Regenerate: node scripts/generate-card-catalog-master.mjs
 --
 -- Combines (in order):
---   1. supabase/card_catalog.sql         — base table + legacy seed
+--   1. supabase/card_catalog.sql         — base table (legacy seed only if card_id is text)
 --   2. supabase/card_catalog_master.sql  — card_banks, columns, view
 --   3. supabase/card_catalog_live_seed.sql — ${cards.length} live cards upsert
 --
