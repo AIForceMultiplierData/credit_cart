@@ -140,6 +140,27 @@ const RAW_CATALOG: Omit<CatalogCard, "bank_logo_url" | "card_image_url">[] = [
       "https://www.icicibank.com/personal-banking/cards/credit-card/sapphiro-credit-card",
   },
   {
+    card_id: "icici_coral",
+    bank_name: "ICICI",
+    card_name: "Coral",
+    style_classes: "bg-gradient-to-br from-orange-700 to-red-950 text-orange-100",
+    apply_url: "https://www.icicibank.com/personal-banking/cards/credit-card",
+  },
+  {
+    card_id: "icici_emeralde",
+    bank_name: "ICICI",
+    card_name: "Emeralde",
+    style_classes: "bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100",
+    apply_url: "https://www.icicibank.com/personal-banking/cards/credit-card",
+  },
+  {
+    card_id: "icici_rubyx",
+    bank_name: "ICICI",
+    card_name: "Rubyx",
+    style_classes: "bg-gradient-to-br from-red-800 to-rose-950 text-red-100",
+    apply_url: "https://www.icicibank.com/personal-banking/cards/credit-card",
+  },
+  {
     card_id: "axis_flipkart",
     bank_name: "AXIS",
     card_name: "Flipkart Axis",

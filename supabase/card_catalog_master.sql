@@ -100,6 +100,9 @@ update public.card_catalog set card_slug = 'sbi_cashback' where upper(bank_name)
 update public.card_catalog set card_slug = 'sbi_simplyclick' where upper(bank_name) = 'SBI' and card_name ilike '%simplyclick%';
 update public.card_catalog set card_slug = 'icici_amazon' where upper(bank_name) = 'ICICI' and card_name ilike '%amazon%';
 update public.card_catalog set card_slug = 'icici_sapphiro' where upper(bank_name) = 'ICICI' and card_name ilike '%sapphiro%';
+update public.card_catalog set card_slug = 'icici_coral' where upper(bank_name) = 'ICICI' and card_name ilike '%coral%';
+update public.card_catalog set card_slug = 'icici_emeralde' where upper(bank_name) = 'ICICI' and card_name ilike '%emeralde%';
+update public.card_catalog set card_slug = 'icici_rubyx' where upper(bank_name) = 'ICICI' and card_name ilike '%rubyx%';
 update public.card_catalog set card_slug = 'axis_flipkart' where upper(bank_name) = 'AXIS' and card_name ilike '%flipkart%';
 update public.card_catalog set card_slug = 'axis_magnus' where upper(bank_name) = 'AXIS' and card_name ilike '%magnus%';
 update public.card_catalog set card_slug = 'axis_vistara' where upper(bank_name) = 'AXIS' and card_name ilike '%vistara%';
@@ -138,7 +141,12 @@ begin
         ('HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy'),
         ('HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom'),
         ('SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white', 'sbi_elite'),
-        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime')
+        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime'),
+        ('ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100', 'icici_amazon'),
+        ('ICICI', 'Sapphiro', 'bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200', 'icici_sapphiro'),
+        ('ICICI', 'Coral', 'bg-gradient-to-br from-orange-700 to-red-950 text-orange-100', 'icici_coral'),
+        ('ICICI', 'Emeralde', 'bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100', 'icici_emeralde'),
+        ('ICICI', 'Rubyx', 'bg-gradient-to-br from-red-800 to-rose-950 text-red-100', 'icici_rubyx')
     ) as v(bank_name, card_name, style_classes, card_slug)
     where not exists (
       select 1 from public.card_catalog c where c.card_slug = v.card_slug
@@ -155,7 +163,12 @@ begin
         ('HDFC', 'Swiggy', 'bg-gradient-to-br from-orange-500 to-purple-800 text-white', 'hdfc_swiggy'),
         ('HDFC', 'Freedom', 'bg-gradient-to-br from-blue-800 to-blue-950 text-white', 'hdfc_freedom'),
         ('SBI', 'Elite', 'bg-gradient-to-br from-slate-800 to-blue-950 text-white', 'sbi_elite'),
-        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime')
+        ('SBI', 'PRIME', 'bg-gradient-to-br from-slate-900 to-emerald-950 text-white', 'sbi_prime'),
+        ('ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100', 'icici_amazon'),
+        ('ICICI', 'Sapphiro', 'bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200', 'icici_sapphiro'),
+        ('ICICI', 'Coral', 'bg-gradient-to-br from-orange-700 to-red-950 text-orange-100', 'icici_coral'),
+        ('ICICI', 'Emeralde', 'bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100', 'icici_emeralde'),
+        ('ICICI', 'Rubyx', 'bg-gradient-to-br from-red-800 to-rose-950 text-red-100', 'icici_rubyx')
     ) as v(bank_name, card_name, style_classes, card_slug)
     on conflict (card_id) do update set
       bank_name = excluded.bank_name,
@@ -183,6 +196,9 @@ update public.card_catalog set card_image_url = '/images/cards/sbi_simplyclick.j
 update public.card_catalog set card_image_url = '/images/cards/sbi_cashback.jpeg' where card_slug = 'sbi_cashback';
 update public.card_catalog set card_image_url = '/images/cards/icici_amazon.jpeg' where card_slug = 'icici_amazon';
 update public.card_catalog set card_image_url = '/images/cards/icici_sapphiro.jpeg' where card_slug = 'icici_sapphiro';
+update public.card_catalog set card_image_url = '/images/cards/icici_coral.jpeg' where card_slug = 'icici_coral';
+update public.card_catalog set card_image_url = '/images/cards/icici_emeralde.jpeg' where card_slug = 'icici_emeralde';
+update public.card_catalog set card_image_url = '/images/cards/icici_rubyx.jpeg' where card_slug = 'icici_rubyx';
 update public.card_catalog set card_image_url = '/images/cards/axis_flipkart.jpeg' where card_slug = 'axis_flipkart';
 update public.card_catalog set card_image_url = '/images/cards/axis_magnus.jpeg' where card_slug = 'axis_magnus';
 update public.card_catalog set card_image_url = '/images/cards/axis_vistara.jpeg' where card_slug = 'axis_vistara';

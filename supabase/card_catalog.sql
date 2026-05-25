@@ -32,6 +32,9 @@ insert into public.card_catalog (card_id, bank_name, card_name, style_classes) v
   ('sbi_simplyclick', 'SBI', 'SimplyCLICK', 'bg-gradient-to-br from-teal-400 to-emerald-700 text-white'),
   ('icici_amazon', 'ICICI', 'Amazon Pay', 'bg-gradient-to-br from-slate-800 to-orange-900 text-orange-100'),
   ('icici_sapphiro', 'ICICI', 'Sapphiro', 'bg-gradient-to-br from-slate-700 to-slate-900 text-slate-200'),
+  ('icici_coral', 'ICICI', 'Coral', 'bg-gradient-to-br from-orange-700 to-red-950 text-orange-100'),
+  ('icici_emeralde', 'ICICI', 'Emeralde', 'bg-gradient-to-br from-emerald-800 to-green-950 text-emerald-100'),
+  ('icici_rubyx', 'ICICI', 'Rubyx', 'bg-gradient-to-br from-red-800 to-rose-950 text-red-100'),
   ('axis_flipkart', 'AXIS', 'Flipkart Axis', 'bg-gradient-to-br from-purple-700 to-fuchsia-900 text-white'),
   ('axis_magnus', 'AXIS', 'Magnus', 'bg-gradient-to-br from-zinc-800 to-red-950 text-red-100')
 on conflict (card_id) do update set

@@ -6,8 +6,10 @@ Place source images in:
   app/public/images/cards/sources/ss2.jpg  (SBI Products catalog — Core Cards grid)
   app/public/images/cards/sources/ss3.jpg  (Axis 2x4 duplicate — optional)
   app/public/images/cards/sources/ss4.jpg  (SBI catalog — optional duplicate of ss2)
+  app/public/images/cards/sources/icici.jpg   (ICICI 5-card sheet: 2 top + 3 bottom)
+  app/public/images/cards/sources/icici2.jpg  (ICICI 8-card sheet: 3 top + 5 bottom)
 
-Or pass a path: python scripts/crop-card-sheets.py path/to/sbi-catalog.jpg
+Or pass paths: python scripts/crop-card-sheets.py path/to/icici-sheet.jpg
 
 Outputs to public/images/cards/ (served at /images/cards/...)
 """
@@ -143,6 +145,43 @@ def crop_sbi_catalog(img: Image.Image) -> None:
             save_card(Image.open(src_path), dest)
 
 
+def crop_icici_five(img: Image.Image) -> None:
+    """ICICI composite: row1 = Coral | Sapphiro, row2 = Amazon | Emeralde | Rubyx."""
+    top = (0.02, 0.06, 0.98, 0.50)
+    bottom = (0.02, 0.50, 0.98, 0.94)
+    picks_top = {
+        "icici_coral.jpeg": (0, 0),
+        "icici_sapphiro.jpeg": (1, 0),
+    }
+    picks_bottom = {
+        "icici_amazon.jpeg": (0, 0),
+        "icici_emeralde.jpeg": (1, 0),
+        "icici_rubyx.jpeg": (2, 0),
+    }
+    for fname, (col, row) in picks_top.items():
+        save_card(crop_cell(img, col, row, 2, 1, top), fname)
+    for fname, (col, row) in picks_bottom.items():
+        save_card(crop_cell(img, col, row, 3, 1, bottom), fname)
+
+
+def crop_icici_eight(img: Image.Image) -> None:
+    """ICICI 8-card sheet: 3 cards top, 5 cards bottom."""
+    w, h = img.size
+    picks = [
+        ("icici_emeralde.jpeg", (0.01, 0.04, 0.33, 0.48)),
+        ("icici_rubyx.jpeg", (0.33, 0.04, 0.48, 0.48)),
+        ("icici_sapphiro.jpeg", (0.48, 0.04, 0.99, 0.48)),
+        ("icici_man_utd.jpeg", (0.01, 0.52, 0.21, 0.94)),
+        ("icici_mine.jpeg", (0.19, 0.52, 0.39, 0.94)),
+        ("icici_coral.jpeg", (0.37, 0.52, 0.57, 0.94)),
+        ("icici_platinum.jpeg", (0.55, 0.52, 0.75, 0.94)),
+        ("icici_amazon.jpeg", (0.73, 0.52, 0.99, 0.94)),
+    ]
+    for fname, (x0, y0, x1, y1) in picks:
+        box = (int(w * x0), int(h * y0), int(w * x1), int(h * y1))
+        save_card(img.crop(box).resize(CARD_SIZE, Image.Resampling.LANCZOS), fname)
+
+
 def sync_photos_from_app() -> None:
     """Copy all card photos from app/public → public/ (Next.js only serves public/)."""
     OUT_PUBLIC.mkdir(parents=True, exist_ok=True)
@@ -165,34 +204,60 @@ def main() -> None:
     ss2 = find_source("ss2")
     ss3 = find_source("ss3")
     ss4 = find_source("ss4")
+    icici5 = find_source("icici")
+    icici8 = find_source("icici2")
 
-    if not any([ss1, ss2, ss3, ss4]):
+    cli_paths = [
+        Path(p).expanduser().resolve()
+        for p in sys.argv[1:]
+        if Path(p).expanduser().resolve().is_file()
+    ]
+
+    if not any([ss1, ss2, ss3, ss4, icici5, icici8, cli_paths]):
         print(
             "No source sheets found. Save composite images as:\n"
             f"  {SOURCES / 'ss1.jpg'}  (Axis grid)\n"
             f"  {SOURCES / 'ss2.jpg'}  (SBI Products catalog)\n"
-            f"  {SOURCES / 'ss4.jpg'}  (SBI catalog alt)\n"
+            f"  {SOURCES / 'icici.jpg'}  (ICICI 5-card sheet)\n"
+            f"  {SOURCES / 'icici2.jpg'}  (ICICI 8-card sheet)\n"
             "Then run: python scripts/crop-card-sheets.py"
         )
         return
+
+    for custom in cli_paths:
+        name = custom.name.lower()
+        img = Image.open(custom).convert("RGB")
+        if "icici" in name:
+            print(f"Cropping ICICI from {custom.name}")
+            crop_icici_eight(img) if "2" in name or "eight" in name else crop_icici_five(img)
+        elif "sbi" in name or name.startswith("ss2") or name.startswith("ss4"):
+            print(f"Cropping SBI from {custom.name}")
+            crop_sbi_catalog(img)
+        elif name.startswith("ss1") or name.startswith("ss3"):
+            print(f"Cropping Axis from {custom.name}")
+            crop_axis_ss1(img)
+        else:
+            print(f"Cropping ICICI (5-card layout) from {custom.name}")
+            crop_icici_five(img)
 
     if ss1:
         print(f"Cropping Axis from {ss1.name}")
         crop_axis_ss1(Image.open(ss1).convert("RGB"))
     sbi_sheet = ss2 or ss4
-    if len(sys.argv) > 1:
-        custom = Path(sys.argv[1]).expanduser().resolve()
-        if custom.is_file():
-            sbi_sheet = custom
-            print(f"Using SBI catalog from {custom}")
-
     if sbi_sheet:
         print(f"Cropping SBI Core Cards from {sbi_sheet.name}")
         crop_sbi_catalog(Image.open(sbi_sheet).convert("RGB"))
+    if icici5:
+        print(f"Cropping ICICI (5-card) from {icici5.name}")
+        crop_icici_five(Image.open(icici5).convert("RGB"))
+    if icici8:
+        print(f"Cropping ICICI (8-card) from {icici8.name}")
+        crop_icici_eight(Image.open(icici8).convert("RGB"))
     if ss3 and not ss1:
         print(f"Cropping Axis from {ss3.name}")
         crop_axis_ss1(Image.open(ss3).convert("RGB"))
 
+    sync_photos_from_app()
     print(f"Done. Card faces in {OUT_PUBLIC}")
 
 

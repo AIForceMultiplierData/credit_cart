@@ -66,6 +66,16 @@ export const CARD_PHOTO_FILES: Record<string, string> = {
 
   icici_sapphiro: "icici_sapphiro.jpeg",
 
+  icici_coral: "icici_coral.jpeg",
+
+  icici_emeralde: "icici_emeralde.jpeg",
+
+  icici_rubyx: "icici_rubyx.jpeg",
+
+  icici_platinum: "icici_platinum.jpeg",
+
+  icici_mine: "icici_mine.jpeg",
+
 }
 
 
