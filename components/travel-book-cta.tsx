@@ -5,7 +5,9 @@ import type { FlightSearchParams } from "@/lib/flight-search"
 import type { HotelSearchParams } from "@/lib/hotel-search"
 import {
   buildFlightAffiliateLinks,
+  buildFlightHandoffSummary,
   buildHotelAffiliateLinks,
+  buildHotelHandoffSummary,
   buildProductAffiliateLinks,
   primaryAffiliateBookLabel,
   type AffiliateLink,
@@ -56,30 +58,48 @@ function PartnerButton({
   )
 }
 
-function resolveLinks(props: AffiliateBookCtaProps): AffiliateLink[] {
-  const { category, flightSearch, hotelSearch, sourceUrl, platform, productTitle } =
-    props
+function resolveLinks(
+  props: AffiliateBookCtaProps
+): { links: AffiliateLink[]; handoffSummary: string | null } {
+  const {
+    category,
+    flightSearch,
+    hotelSearch,
+    sourceUrl,
+    platform,
+    productTitle,
+    bestCardLabel,
+  } = props
 
   if (category === "flight" && flightSearch) {
-    return buildFlightAffiliateLinks(flightSearch)
+    return {
+      links: buildFlightAffiliateLinks(flightSearch, bestCardLabel),
+      handoffSummary: buildFlightHandoffSummary(flightSearch),
+    }
   }
   if (category === "hotels" && hotelSearch) {
-    return buildHotelAffiliateLinks(hotelSearch)
+    return {
+      links: buildHotelAffiliateLinks(hotelSearch, bestCardLabel),
+      handoffSummary: buildHotelHandoffSummary(hotelSearch),
+    }
   }
   if (category === "product" && sourceUrl?.trim()) {
-    return buildProductAffiliateLinks(
-      sourceUrl.trim(),
-      platform ?? "Store",
-      productTitle ?? undefined
-    )
+    return {
+      links: buildProductAffiliateLinks(
+        sourceUrl.trim(),
+        platform ?? "Store",
+        productTitle ?? undefined
+      ),
+      handoffSummary: null,
+    }
   }
-  return []
+  return { links: [], handoffSummary: null }
 }
 
-/** OTA / marketplace checkout CTAs after card ranking */
+/** OTA / marketplace checkout CTAs after card ranking (dynamic deep links, no iframes) */
 export function TravelBookCta(props: AffiliateBookCtaProps) {
   const { category, bestCardLabel, onApplyCard, className, platform } = props
-  const links = resolveLinks(props)
+  const { links, handoffSummary } = resolveLinks(props)
 
   if (links.length === 0) return null
 
@@ -90,10 +110,10 @@ export function TravelBookCta(props: AffiliateBookCtaProps) {
 
   const headline =
     category === "flight"
-      ? "Continue on OTA — dates & route pre-filled"
+      ? "Your route & dates are pre-filled on the airline/OTA site"
       : category === "hotels"
-        ? "Continue on OTA — stay dates pre-filled"
-        : "Continue to store — your product link opens with affiliate tracking when configured"
+        ? "Your destination, stay dates, rooms & guests are pre-filled"
+        : "Your product link opens on the store with affiliate tracking when configured"
 
   return (
     <div
@@ -111,9 +131,14 @@ export function TravelBookCta(props: AffiliateBookCtaProps) {
               : "Book with your best card"}
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
-            {headline}. Rank cards in PoolPay, then complete purchase on the
-            partner site.
+            {headline}. Rank cards in PoolPay first — then complete purchase on
+            the partner site (no live pricing engine, zero iframe widgets).
           </p>
+          {handoffSummary ? (
+            <p className="mt-2 rounded-lg border border-slate-800/80 bg-slate-950/50 px-2.5 py-1.5 text-[11px] font-medium text-slate-300">
+              {handoffSummary}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -137,7 +162,7 @@ export function TravelBookCta(props: AffiliateBookCtaProps) {
       {alternates.length > 0 ? (
         <div className="mt-3 space-y-2 border-t border-slate-800/60 pt-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            Also try
+            Also try (same search pre-filled)
           </p>
           {alternates.map((link) => (
             <PartnerButton key={link.partner} link={link} variant="secondary" />

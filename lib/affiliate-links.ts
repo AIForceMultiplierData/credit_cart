@@ -1,5 +1,9 @@
 import type { FlightSearchParams } from "@/lib/flight-search"
-import type { HotelSearchParams } from "@/lib/hotel-search"
+import {
+  formatHotelDate,
+  guestSummary,
+  type HotelSearchParams,
+} from "@/lib/hotel-search"
 
 /**
  * Affiliate markers — leave blank in .env until you have IDs.
@@ -168,15 +172,145 @@ export function buildGoibiboFlightUrl(params: FlightSearchParams): string {
   return wrapTravelpayoutsClick(url.toString())
 }
 
+function hotelDestinationLabel(params: HotelSearchParams): string {
+  return params.destination?.trim() || params.city?.trim() || "India"
+}
+
+function hotelNightCount(params: HotelSearchParams): number {
+  return Math.max(
+    1,
+    Math.ceil(
+      (new Date(`${params.checkOut}T12:00:00`).getTime() -
+        new Date(`${params.checkIn}T12:00:00`).getTime()) /
+        86400000
+    )
+  )
+}
+
+/** MakeMyTrip roomStayQualifier — adults (e) and children (c) per room */
+function buildMmtRoomStayQualifier(params: HotelSearchParams): string {
+  const { adults, children } = params.guests
+  const rooms = Math.max(1, params.rooms)
+  const adultsPerRoom = Math.max(1, Math.ceil(adults / rooms))
+  const childrenPerRoom =
+    children > 0 ? Math.max(1, Math.ceil(children / rooms)) : 0
+
+  const segment =
+    childrenPerRoom > 0
+      ? `${adultsPerRoom}e|${childrenPerRoom}c`
+      : `${adultsPerRoom}e`
+
+  return Array.from({ length: rooms }, () => segment).join("|")
+}
+
+/** Human-readable handoff line shown above OTA buttons */
+export function buildHotelHandoffSummary(params: HotelSearchParams): string {
+  const nights = hotelNightCount(params)
+  return [
+    hotelDestinationLabel(params),
+    `${formatHotelDate(params.checkIn)} – ${formatHotelDate(params.checkOut)}`,
+    `${nights} night${nights === 1 ? "" : "s"}`,
+    guestSummary(params.guests, params.rooms),
+  ].join(" · ")
+}
+
+export function buildHotelPartnerCtaLabel(
+  partner: AffiliatePartner,
+  cardName?: string | null
+): string {
+  const prefix = cardName?.trim() ? "Apply card & " : ""
+  switch (partner) {
+    case "makemytrip":
+      return `${prefix}Book on MakeMyTrip`
+    case "booking":
+      return `${prefix}Search hotels on Booking.com`
+    case "cleartrip":
+      return `${prefix}Book on Cleartrip`
+    case "goibibo":
+      return `${prefix}Book on Goibibo`
+    case "agoda":
+      return `${prefix}Search on Agoda`
+    default:
+      return `${prefix}Continue booking`
+  }
+}
+
+export function buildFlightPartnerCtaLabel(
+  partner: AffiliatePartner,
+  cardName?: string | null
+): string {
+  const prefix = cardName?.trim() ? "Apply card & " : ""
+  switch (partner) {
+    case "makemytrip":
+      return `${prefix}Book flights on MakeMyTrip`
+    case "cleartrip":
+      return `${prefix}Book flights on Cleartrip`
+    case "goibibo":
+      return `${prefix}Book flights on Goibibo`
+    default:
+      return `${prefix}Continue booking`
+  }
+}
+
+export function buildFlightHandoffSummary(params: FlightSearchParams): string {
+  const route = `${params.originCode} → ${params.destinationCode}`
+  const dates =
+    params.tripType === "return" && params.returnDate
+      ? `${formatHotelDate(params.departDate)} – ${formatHotelDate(params.returnDate)}`
+      : formatHotelDate(params.departDate)
+  const pax =
+    params.passengers.adults +
+    params.passengers.children +
+    params.passengers.infants
+  return `${route} · ${dates} · ${pax} traveller${pax === 1 ? "" : "s"} · ${params.tripType === "return" ? "Round trip" : "One way"}`
+}
+
 export function buildMakeMyTripHotelUrl(params: HotelSearchParams): string {
-  const city = params.destination || params.city
+  const city = hotelDestinationLabel(params)
   const url = new URL("https://www.makemytrip.com/hotels/hotel-listing/")
   url.searchParams.set("checkin", formatDateDdMmYyyy(params.checkIn))
   url.searchParams.set("checkout", formatDateDdMmYyyy(params.checkOut))
   url.searchParams.set("city", city)
   url.searchParams.set("country", "IN")
-  url.searchParams.set("roomStayQualifier", `${params.guests.adults}e`)
+  url.searchParams.set("roomStayQualifier", buildMmtRoomStayQualifier(params))
   url.searchParams.set("roomCount", String(params.rooms))
+  if (params.lat != null && params.lng != null) {
+    url.searchParams.set("lat", String(params.lat))
+    url.searchParams.set("lng", String(params.lng))
+    url.searchParams.set("locusId", params.placeId ?? "")
+    url.searchParams.set("locusType", "city")
+  }
+  return wrapTravelpayoutsClick(url.toString())
+}
+
+export function buildCleartripHotelUrl(params: HotelSearchParams): string {
+  const city = hotelDestinationLabel(params)
+  const url = new URL("https://www.cleartrip.com/hotels/results")
+  url.searchParams.set("cityName", city)
+  url.searchParams.set("country", "IN")
+  url.searchParams.set("chk_in", formatDateDdMmYyyy(params.checkIn))
+  url.searchParams.set("chk_out", formatDateDdMmYyyy(params.checkOut))
+  url.searchParams.set("rooms", String(params.rooms))
+  const travellers = `A-${params.guests.adults}${
+    params.guests.children > 0 ? `_C-${params.guests.children}` : ""
+  }`
+  url.searchParams.set("travellers", travellers)
+  if (params.lat != null && params.lng != null) {
+    url.searchParams.set("latitude", String(params.lat))
+    url.searchParams.set("longitude", String(params.lng))
+  }
+  return wrapTravelpayoutsClick(url.toString())
+}
+
+export function buildGoibiboHotelUrl(params: HotelSearchParams): string {
+  const city = hotelDestinationLabel(params)
+  const url = new URL("https://www.goibibo.com/hotels/")
+  url.searchParams.set("city", city)
+  url.searchParams.set("checkin", formatDateDdMmYyyy(params.checkIn))
+  url.searchParams.set("checkout", formatDateDdMmYyyy(params.checkOut))
+  url.searchParams.set("roomCount", String(params.rooms))
+  url.searchParams.set("adults", String(params.guests.adults))
+  url.searchParams.set("children", String(params.guests.children))
   if (params.lat != null && params.lng != null) {
     url.searchParams.set("lat", String(params.lat))
     url.searchParams.set("lng", String(params.lng))
@@ -185,7 +319,7 @@ export function buildMakeMyTripHotelUrl(params: HotelSearchParams): string {
 }
 
 export function buildBookingHotelUrl(params: HotelSearchParams): string {
-  const destination = params.destination || params.city
+  const destination = hotelDestinationLabel(params)
   const url = new URL("https://www.booking.com/searchresults.html")
   url.searchParams.set("ss", destination)
   url.searchParams.set("checkin", params.checkIn)
@@ -195,11 +329,20 @@ export function buildBookingHotelUrl(params: HotelSearchParams): string {
   url.searchParams.set("no_rooms", String(params.rooms))
   url.searchParams.set("lang", "en-gb")
   url.searchParams.set("selected_currency", "INR")
+  if (params.guests.children > 0) {
+    for (let i = 0; i < params.guests.children; i += 1) {
+      url.searchParams.append("age", "8")
+    }
+  }
+  if (params.lat != null && params.lng != null) {
+    url.searchParams.set("latitude", String(params.lat))
+    url.searchParams.set("longitude", String(params.lng))
+  }
   return wrapTravelpayoutsClick(url.toString())
 }
 
 export function buildAgodaHotelUrl(params: HotelSearchParams): string {
-  const destination = params.destination || params.city
+  const destination = hotelDestinationLabel(params)
   const url = new URL("https://www.agoda.com/search")
   url.searchParams.set("city", destination)
   url.searchParams.set("checkIn", formatDateYyyymmdd(params.checkIn))
@@ -207,31 +350,44 @@ export function buildAgodaHotelUrl(params: HotelSearchParams): string {
   url.searchParams.set("rooms", String(params.rooms))
   url.searchParams.set("adults", String(params.guests.adults))
   url.searchParams.set("children", String(params.guests.children))
+  if (params.guests.children > 0) {
+    url.searchParams.set(
+      "childAges",
+      Array(params.guests.children).fill("8").join(",")
+    )
+  }
   url.searchParams.set("cid", "-1")
   url.searchParams.set("currency", "INR")
+  url.searchParams.set("los", String(hotelNightCount(params)))
+  if (params.lat != null && params.lng != null) {
+    url.searchParams.set("latitude", String(params.lat))
+    url.searchParams.set("longitude", String(params.lng))
+  }
   return wrapTravelpayoutsClick(url.toString())
 }
 
 export function buildFlightAffiliateLinks(
-  params: FlightSearchParams
+  params: FlightSearchParams,
+  bestCardLabel?: string | null
 ): AffiliateLink[] {
+  const card = bestCardLabel ?? null
   return [
     {
       partner: "makemytrip",
-      label: "Book on MakeMyTrip",
+      label: buildFlightPartnerCtaLabel("makemytrip", card),
       shortLabel: "MakeMyTrip",
       href: buildMakeMyTripFlightUrl(params),
       primary: true,
     },
     {
       partner: "cleartrip",
-      label: "Book on Cleartrip",
+      label: buildFlightPartnerCtaLabel("cleartrip", card),
       shortLabel: "Cleartrip",
       href: buildCleartripFlightUrl(params),
     },
     {
       partner: "goibibo",
-      label: "Book on Goibibo",
+      label: buildFlightPartnerCtaLabel("goibibo", card),
       shortLabel: "Goibibo",
       href: buildGoibiboFlightUrl(params),
     },
@@ -239,27 +395,41 @@ export function buildFlightAffiliateLinks(
 }
 
 export function buildHotelAffiliateLinks(
-  params: HotelSearchParams
+  params: HotelSearchParams,
+  bestCardLabel?: string | null
 ): AffiliateLink[] {
+  const card = bestCardLabel ?? null
   return [
     {
       partner: "booking",
-      label: "Search on Booking.com",
+      label: buildHotelPartnerCtaLabel("booking", card),
       shortLabel: "Booking.com",
       href: buildBookingHotelUrl(params),
       primary: true,
     },
     {
       partner: "makemytrip",
-      label: "Book on MakeMyTrip",
+      label: buildHotelPartnerCtaLabel("makemytrip", card),
       shortLabel: "MakeMyTrip",
       href: buildMakeMyTripHotelUrl(params),
     },
     {
+      partner: "cleartrip",
+      label: buildHotelPartnerCtaLabel("cleartrip", card),
+      shortLabel: "Cleartrip",
+      href: buildCleartripHotelUrl(params),
+    },
+    {
       partner: "agoda",
-      label: "Search on Agoda",
+      label: buildHotelPartnerCtaLabel("agoda", card),
       shortLabel: "Agoda",
       href: buildAgodaHotelUrl(params),
+    },
+    {
+      partner: "goibibo",
+      label: buildHotelPartnerCtaLabel("goibibo", card),
+      shortLabel: "Goibibo",
+      href: buildGoibiboHotelUrl(params),
     },
   ]
 }
