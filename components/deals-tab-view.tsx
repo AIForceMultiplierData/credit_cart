@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Sparkles, Zap } from "lucide-react"
 import { DealsFeed, type Deal } from "@/components/deals-feed"
 import { LenderFeed } from "@/app/deals/lender-feed"
+import { consumeDealsTabFilter } from "@/lib/deals-nav"
+import type { DealAvailability } from "@/lib/deal-availability"
 import { cn } from "@/lib/utils"
 
 export type DealsDashboardMode = "earning" | "hot-deals"
@@ -49,9 +51,14 @@ function readStoredMode(): DealsDashboardMode {
 export function DealsTabView({ onDealClick }: DealsTabViewProps) {
   const [mode, setMode] = useState<DealsDashboardMode>("hot-deals")
   const [hydrated, setHydrated] = useState(false)
+  const [feedFilter, setFeedFilter] = useState<
+    DealAvailability | "all" | null
+  >(null)
 
   useEffect(() => {
     setMode(readStoredMode())
+    const pending = consumeDealsTabFilter()
+    if (pending) setFeedFilter(pending)
     setHydrated(true)
   }, [])
 
@@ -111,7 +118,10 @@ export function DealsTabView({ onDealClick }: DealsTabViewProps) {
       {hydrated && mode === "earning" ? (
         <LenderFeed />
       ) : hydrated ? (
-        <DealsFeed onDealClick={onDealClick} />
+        <DealsFeed
+          onDealClick={onDealClick}
+          initialFeedFilter={feedFilter ?? undefined}
+        />
       ) : (
         <div className="flex min-h-[200px] items-center justify-center px-4">
           <p className="text-sm text-slate-500">Loading deals…</p>

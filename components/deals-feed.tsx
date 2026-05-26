@@ -103,9 +103,11 @@ function viralDealToLegacyDeal(deal: ViralDeal): Deal {
 
 interface DealsFeedProps {
   onDealClick: (deal: Deal) => void
+  /** Pre-select Ping / Circle / Wallet tab (e.g. from search with no card) */
+  initialFeedFilter?: FeedFilter
 }
 
-export function DealsFeed({ onDealClick }: DealsFeedProps) {
+export function DealsFeed({ onDealClick, initialFeedFilter }: DealsFeedProps) {
   const { user, session } = useAuth()
   const { searchCards, loading: cardsLoading } = useDealSearchCards(user?.id)
   const { openLeadForm } = useCardLead()
@@ -115,7 +117,9 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
   const [usedSerper, setUsedSerper] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeFilter, setActiveFilter] = useState<FeedFilter>("all")
+  const [activeFilter, setActiveFilter] = useState<FeedFilter>(
+    initialFeedFilter ?? "all"
+  )
 
   const loadDeals = useCallback(
     async (opts?: { refresh?: boolean; filter?: FeedFilter }) => {
@@ -186,9 +190,16 @@ export function DealsFeed({ onDealClick }: DealsFeedProps) {
 
   useEffect(() => {
     if (!user || cardsLoading) return
-    void loadDeals({ refresh: true, filter: activeFilter })
+    const filter =
+      initialFeedFilter && initialFeedFilter !== "all"
+        ? initialFeedFilter
+        : activeFilter
+    if (initialFeedFilter && initialFeedFilter !== "all") {
+      setActiveFilter(initialFeedFilter)
+    }
+    void loadDeals({ refresh: true, filter })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial fetch when cards ready
-  }, [user?.id, cardsLoading])
+  }, [user?.id, cardsLoading, initialFeedFilter])
 
   const handleFilterChange = (filter: FeedFilter) => {
     setActiveFilter(filter)

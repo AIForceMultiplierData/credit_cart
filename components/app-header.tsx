@@ -13,6 +13,7 @@ type AppHeaderProps = {
   displayName?: string
   onEditProfile: () => void
   onNavigate: (tab: TabType) => void
+  onRequestSignIn?: () => void
   className?: string
 }
 
@@ -22,6 +23,7 @@ export function AppHeader({
   displayName,
   onEditProfile,
   onNavigate,
+  onRequestSignIn,
   className,
 }: AppHeaderProps) {
   return (
@@ -48,6 +50,7 @@ export function AppHeader({
         displayName={displayName}
         loading={loading}
         onEditProfile={onEditProfile}
+        onRequestSignIn={onRequestSignIn}
       />
     </div>
   )

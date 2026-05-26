@@ -158,6 +158,10 @@ export function sortOffersStrict(
   estimatedPrice: number | null
 ): DealOffer[] {
   const sorted = [...offers].sort((a, b) => {
+    const aQ = a.qualifies !== false && !a.platform_mismatch ? 1 : 0
+    const bQ = b.qualifies !== false && !b.platform_mismatch ? 1 : 0
+    if (aQ !== bQ) return bQ - aQ
+
     if (estimatedPrice !== null && a.discount_amount !== b.discount_amount) {
       return b.discount_amount - a.discount_amount
     }

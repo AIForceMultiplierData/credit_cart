@@ -19,6 +19,7 @@ import {
 } from "@/lib/deal-search"
 import { buildMissingCardTeasers } from "@/lib/deal-search-missing-cards"
 import { enrichDealSearchResult } from "@/lib/deal-offer-breakdown"
+import { attachDealSearchViews } from "@/lib/deal-search-views"
 import {
   buildFlightProductTitle,
   buildFlightReferenceUrl,
@@ -73,6 +74,8 @@ export type DealSearchOverrides = {
   estimatedPrice?: number | null
   serperQuery?: string
   travelListings?: TravelListing[]
+  rawListings?: TravelListing[]
+  serperQueries?: string[]
   selectedTravelListingId?: string | null
   platform?: string
 }
@@ -80,7 +83,8 @@ export type DealSearchOverrides = {
 export async function buildFlightOverrides(
   flight: FlightSearchParams
 ): Promise<DealSearchOverrides & { url: string } | { error: string }> {
-  const listings = await fetchFlightListings(flight)
+  const fetched = await fetchFlightListings(flight)
+  const listings = fetched.listings
   const { listing, price } = resolveFlightListing(
     listings,
     flight.estimatedFare,
@@ -103,6 +107,8 @@ export async function buildFlightOverrides(
     estimatedPrice: price,
     serperQuery: buildFlightSerperQuery(flight),
     travelListings: listings,
+    rawListings: fetched.raw_listings,
+    serperQueries: fetched.serper_queries,
     selectedTravelListingId:
       flight.selectedListingId ?? selected?.id ?? listings[0]?.id ?? null,
     platform: selected?.provider ?? "Travel",
@@ -113,7 +119,8 @@ export async function buildFlightOverrides(
 export async function buildHotelOverrides(
   hotel: HotelSearchParams
 ): Promise<DealSearchOverrides & { url: string } | { error: string }> {
-  const listings = await fetchHotelListings(hotel)
+  const fetched = await fetchHotelListings(hotel)
+  const listings = fetched.listings
   const { listing, price } = resolveHotelListing(
     listings,
     hotel.estimatedTotal,
@@ -136,6 +143,8 @@ export async function buildHotelOverrides(
     estimatedPrice: price,
     serperQuery: buildHotelSerperQuery(hotel),
     travelListings: listings,
+    rawListings: fetched.raw_listings,
+    serperQueries: fetched.serper_queries,
     selectedTravelListingId:
       hotel.selectedListingId ?? selected?.id ?? listings[0]?.id ?? null,
     platform: selected?.provider ?? "Travel",
@@ -146,7 +155,8 @@ export async function buildHotelOverrides(
 export async function buildProductOverrides(
   product: ProductSearchParams
 ): Promise<DealSearchOverrides & { url: string } | { error: string }> {
-  const listings = await fetchProductListings(product)
+  const fetched = await fetchProductListings(product)
+  const listings = fetched.listings
   if (listings.length === 0) {
     return {
       error:
@@ -193,6 +203,8 @@ export async function buildProductOverrides(
     estimatedPrice: price,
     serperQuery: buildProductSerperQuery(product),
     travelListings: listings,
+    rawListings: fetched.raw_listings,
+    serperQueries: fetched.serper_queries,
     selectedTravelListingId: selected?.id ?? listings[0]?.id ?? null,
     platform: selected?.provider ?? detectPlatform(url),
     url,
@@ -548,7 +560,14 @@ function finalizeSearchResult(
   url: string,
   overrides?: DealSearchOverrides
 ): DealSearchResult {
-  return applyTravelToResult(enrichDealSearchResult(result, url), overrides)
+  const enriched = applyTravelToResult(
+    enrichDealSearchResult(result, url),
+    overrides
+  )
+  return attachDealSearchViews(enriched, {
+    listings_all: overrides?.rawListings ?? enriched.travel_listings,
+    serper_queries: overrides?.serperQueries ?? [],
+  })
 }
 
 export async function searchDealsForWallet(

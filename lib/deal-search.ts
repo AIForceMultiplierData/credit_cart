@@ -34,6 +34,8 @@ export type DealOffer = {
   /** Whether spend meets min transaction rules */
   qualifies?: boolean
   qualification_note?: string
+  /** Card program does not apply on this store URL */
+  platform_mismatch?: boolean
   /** Circle pool: your half of cashback */
   your_cashback_share?: number | null
   /** Circle pool: card owner's half */
@@ -55,7 +57,13 @@ export type TravelListing = {
   badge?: string
   /** Product listing — checkout deep link */
   product_url?: string
+  /** Parsed from title — storage / colour for product rows */
+  variant_label?: string
+  storage_gb?: string
+  color?: string
 }
+
+export type { DealSearchRawSnapshot, DealSearchViews } from "@/lib/deal-search-views"
 
 export type DealSearchResult = {
   product_title: string
@@ -75,6 +83,10 @@ export type DealSearchResult = {
   missing_card_teasers: MissingCardTeaser[]
   wallet_card_count: number
   circle_card_count: number
+  /** Precomputed UI: card valid / invalid + 50/50 flags */
+  views?: import("@/lib/deal-search-views").DealSearchViews
+  /** Unfiltered listings + Serper queries from this search */
+  raw_snapshot?: import("@/lib/deal-search-views").DealSearchRawSnapshot
 }
 
 export type MarketOffer = {

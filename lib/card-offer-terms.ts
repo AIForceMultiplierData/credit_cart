@@ -159,6 +159,21 @@ const DEFAULT_RULE: Omit<CardOfferRule, "card_id" | "urlPattern"> = {
   ],
 }
 
+/** Whether this card has a program that applies on the checkout URL */
+export function cardOffersOnStoreUrl(input: {
+  card_id: string
+  url: string
+  category: DealSearchCategory
+}): boolean {
+  const storeRules = CARD_OFFER_RULES.filter(
+    (rule) =>
+      rule.card_id === input.card_id &&
+      (!rule.categories || rule.categories.includes(input.category))
+  )
+  if (storeRules.length === 0) return true
+  return storeRules.some((rule) => rule.urlPattern.test(input.url))
+}
+
 export function findCardOfferRule(input: {
   card_id: string
   url: string

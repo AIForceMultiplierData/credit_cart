@@ -1,8 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CreditCard, Sparkles, TrendingUp, Users, Zap } from "lucide-react"
+import { CreditCard, TrendingUp, Users, Zap } from "lucide-react"
+import { HomeHeroBanner } from "@/components/home-hero-banner"
+import { DEFAULT_SEARCH_CATEGORY } from "@/lib/search-category-rules"
+import type { DealSearchCategory } from "@/lib/deal-search"
+import { setDealsTabFilter } from "@/lib/deals-nav"
 import { Skeleton } from "@/components/ui/skeleton"
+import type { Deal } from "@/components/deals-feed"
 import { DealSearchBar } from "@/components/deal-search-bar"
 import { useAuth } from "@/hooks/useAuth"
 import { useProfile } from "@/hooks/useProfile"
@@ -13,6 +18,7 @@ import { cn } from "@/lib/utils"
 interface HomeViewProps {
   onNavigate: (tab: "deals" | "wallet" | "activity") => void
   onSignIn?: () => void
+  onPingFromSearch?: (deal: Deal) => void
 }
 
 type ProfileStats = {
@@ -78,7 +84,11 @@ function StatTile({
   )
 }
 
-export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
+export function HomeView({
+  onNavigate,
+  onSignIn,
+  onPingFromSearch,
+}: HomeViewProps) {
   const { user, loading: authLoading } = useAuth()
   const { circleCount, loading: profileLoading } = useProfile()
   const { cards, loading: cardsLoading } = useWalletCards(user?.id)
@@ -87,6 +97,8 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
     total_saved: 0,
     active_deals_count: 0,
   })
+  const [searchCategory, setSearchCategory] =
+    useState<DealSearchCategory>(DEFAULT_SEARCH_CATEGORY)
 
   const fetchStats = useCallback(async () => {
     if (!user) {
@@ -130,32 +142,22 @@ export function HomeView({ onNavigate, onSignIn }: HomeViewProps) {
 
   return (
     <div className="px-4 pb-32 pt-2">
-      <div className="relative mb-6 overflow-hidden rounded-3xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-blue-500/10 to-purple-500/20" />
-        <div className="relative p-6">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/20">
-              <Sparkles className="h-5 w-5 text-emerald-400" />
-            </div>
-            <span className="text-sm font-semibold text-emerald-400">
-              Welcome to PoolPay
-            </span>
-          </div>
-          <h1 className="mb-2 text-balance text-3xl font-bold text-slate-50">
-            Co-Purchase.
-            <br />
-            <span className="text-emerald-400">Save Together.</span>
-          </h1>
-          <p className="text-sm leading-relaxed text-slate-400">
-            Pool credit cards with your trusted circle to unlock exclusive
-            discounts on premium products.
-          </p>
-        </div>
-      </div>
+      <HomeHeroBanner
+        category={searchCategory}
+        onCategoryChange={setSearchCategory}
+      />
 
       <DealSearchBar
+        category={searchCategory}
+        onCategoryChange={setSearchCategory}
         onNeedWallet={() => onNavigate("wallet")}
         onNeedSignIn={onSignIn}
+        onNavigate={(tab) => onNavigate(tab)}
+        onPingFromSearch={onPingFromSearch}
+        onBrowseLenders={() => {
+          setDealsTabFilter("ping_to_split")
+          onNavigate("deals")
+        }}
       />
 
       <div className="mb-6 grid h-52 w-full grid-cols-2 grid-rows-2 gap-3 sm:h-56">

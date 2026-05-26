@@ -20,6 +20,7 @@ type ProfileMenuProps = {
   displayName?: string
   loading?: boolean
   onEditProfile: () => void
+  onRequestSignIn?: () => void
 }
 
 function getInitial(user: SupabaseUser | null, displayName?: string): string {
@@ -36,6 +37,7 @@ export function ProfileMenu({
   displayName,
   loading,
   onEditProfile,
+  onRequestSignIn,
 }: ProfileMenuProps) {
   const initial = getInitial(user, displayName)
   const label =
@@ -55,11 +57,14 @@ export function ProfileMenu({
     })
   }
 
-  async function handleSignIn() {
-    const { error } = await signInWithGoogle()
-    if (error) {
-      toast.error("Sign in failed", { description: error })
+  function handleSignIn() {
+    if (onRequestSignIn) {
+      onRequestSignIn()
+      return
     }
+    void signInWithGoogle().then(({ error }) => {
+      if (error) toast.error("Sign in failed", { description: error })
+    })
   }
 
   if (!user) {

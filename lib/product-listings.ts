@@ -3,9 +3,18 @@ import { detectPlatform } from "@/lib/deal-search"
 import {
   inferProductIntent,
   isAccessoryListing,
+  isPhoneDeviceListing,
   titleMatchesQuery,
   type ProductIntent,
 } from "@/lib/product-query-intent"
+import { parseProductVariantHints } from "@/lib/product-variant-parse"
+import { buildProductShoppingQueries } from "@/lib/search-category-rules"
+
+export type ListingsFetchResult = {
+  listings: TravelListing[]
+  raw_listings: TravelListing[]
+  serper_queries: string[]
+}
 import type { ProductSearchParams } from "@/lib/product-search"
 import { SERPER_API_KEYS } from "@/lib/llm-router"
 import {
@@ -53,6 +62,13 @@ const MAJOR_STORES: Array<{
     searchUrl: (q) =>
       `https://www.vijaysales.com/search?q=${encodeURIComponent(q)}`,
     shoppingQuery: (q) => `${q} vijaysales.com mobile`,
+  },
+  {
+    provider: "eBay",
+    domain: /ebay\.(in|com)/i,
+    searchUrl: (q) =>
+      `https://www.ebay.in/sch/i.html?_nkw=${encodeURIComponent(q)}`,
+    shoppingQuery: (q) => `${q} buy ebay.in india -case -cover`,
   },
 ]
 
@@ -122,6 +138,9 @@ function scoreListing(
   const title = listing.title
 
   if (isAccessoryListing(title, intent)) return -1_000
+  if (intent.kind === "phone" && !isPhoneDeviceListing(title, intent)) {
+    return -800
+  }
   if (listing.price < intent.minPrice || listing.price > intent.maxPrice) {
     return -500
   }
@@ -158,6 +177,7 @@ function listingFromSerper(
 
   const title = item.title?.trim() || query
   if (isAccessoryListing(title, intent)) return null
+  if (intent.kind === "phone" && !isPhoneDeviceListing(title, intent)) return null
   if (price < intent.minPrice || price > intent.maxPrice) return null
 
   const store = resolveStoreFromItem(item.link, item.source)
@@ -171,16 +191,23 @@ function listingFromSerper(
     ? productUrlForStore(store, item.link, query)
     : item.link?.trim() || undefined
 
+  const variants = parseProductVariantHints(title)
   const listing: TravelListing = {
     id: `prd-${provider.toLowerCase().replace(/\s+/g, "_")}-${index}`,
     category: "product",
     provider,
     title,
-    subtitle: store?.provider ?? provider,
+    subtitle: variants.variant_label ?? store?.provider ?? provider,
     price,
-    meta: ["Live price", provider],
+    meta: [
+      "Live price",
+      provider,
+      ...(variants.storage_gb ? [variants.storage_gb] : []),
+      ...(variants.color ? [variants.color] : []),
+    ],
     refundable: true,
     product_url,
+    ...variants,
   }
 
   return scoreListing(listing, query, intent) >= 0 ? listing : null
@@ -261,12 +288,48 @@ function pickDefaultListing(
   return scored[0]?.l ?? listings.find((l) => l.price >= intent.minPrice) ?? null
 }
 
+function listingFromSerperRaw(
+  item: {
+    title?: string
+    price?: string
+    source?: string
+    link?: string
+  },
+  query: string,
+  intent: ProductIntent,
+  index: number
+): TravelListing | null {
+  const price = parseInrPrice(item.price)
+  if (!price || price <= 0) return null
+  const title = item.title?.trim() || query
+  const store = resolveStoreFromItem(item.link, item.source)
+  const provider = store?.provider ?? item.source ?? "Store"
+  const product_url = store
+    ? productUrlForStore(store, item.link, query)
+    : item.link?.trim() || undefined
+  const variants = parseProductVariantHints(title)
+  return {
+    id: `prd-raw-${index}`,
+    category: "product",
+    provider,
+    title,
+    subtitle: variants.variant_label ?? provider,
+    price,
+    meta: ["Raw Serper", provider],
+    refundable: true,
+    product_url,
+    ...variants,
+  }
+}
+
 export async function fetchProductListings(
   params: ProductSearchParams
-): Promise<TravelListing[]> {
+): Promise<ListingsFetchResult> {
   const query = params.query.trim() || "product"
   const intent = inferProductIntent(query)
   const listings: TravelListing[] = []
+  const raw_listings: TravelListing[] = []
+  const serper_queries = buildProductShoppingQueries(params)
 
   if (params.pastedUrl) {
     const pasted = listingFromPastedUrl(params.pastedUrl, query)
@@ -280,9 +343,12 @@ export async function fetchProductListings(
       )
     )
 
-    const general = await fetchSerperShopping(
-      `${query} price india ${intent.kind} -case -cover -rental`,
-      8
+    const generalQueries =
+      serper_queries.length > 0
+        ? serper_queries
+        : [`${query} price india ${intent.kind} -case -cover -rental`]
+    const generalBatches = await Promise.all(
+      generalQueries.map((q) => fetchSerperShopping(q, 6))
     )
 
     const byProvider = new Map<string, TravelListing>()
@@ -307,13 +373,19 @@ export async function fetchProductListings(
     let idx = 0
     for (const batch of perStore) {
       for (const item of batch) {
+        const raw = listingFromSerperRaw(item, query, intent, idx)
+        if (raw) raw_listings.push(raw)
         consider(listingFromSerper(item, query, intent, idx))
         idx += 1
       }
     }
-    for (const item of general) {
-      consider(listingFromSerper(item, query, intent, idx))
-      idx += 1
+    for (const batch of generalBatches) {
+      for (const item of batch) {
+        const raw = listingFromSerperRaw(item, query, intent, idx)
+        if (raw) raw_listings.push(raw)
+        consider(listingFromSerper(item, query, intent, idx))
+        idx += 1
+      }
     }
 
     listings.push(...byProvider.values())
@@ -321,6 +393,9 @@ export async function fetchProductListings(
 
   let output =
     listings.length > 0 ? [...listings] : generateFallbackListings(query, intent)
+  if (raw_listings.length === 0) {
+    raw_listings.push(...output)
+  }
 
   if (params.pastedUrl) {
     const pasted = listingFromPastedUrl(params.pastedUrl, query)
@@ -348,7 +423,7 @@ export async function fetchProductListings(
     .filter((l) => l.price >= intent.minPrice)
     .sort((a, b) => a.price - b.price)[0]
 
-  return output.slice(0, 8).map((row) => ({
+  const listingsOut = output.slice(0, 8).map((row) => ({
     ...row,
     subtitle:
       row.product_url && !BLOCKED_URL_HOSTS.test(row.product_url)
@@ -363,10 +438,17 @@ export async function fetchProductListings(
     badge:
       row.id === defaultPick?.id
         ? "Best match"
-        : row.id === cheapestAmongValid?.id && cheapestAmongValid.id !== defaultPick?.id
+        : row.id === cheapestAmongValid?.id &&
+            cheapestAmongValid.id !== defaultPick?.id
           ? "Lowest price"
           : row.badge,
   }))
+
+  return {
+    listings: listingsOut,
+    raw_listings,
+    serper_queries,
+  }
 }
 
 export function resolveProductListing(

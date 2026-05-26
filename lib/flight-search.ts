@@ -1,4 +1,5 @@
 import { FALLBACK_AIRPORT_OPTIONS } from "@/lib/indian-airports"
+import { buildFlightShoppingQueries } from "@/lib/search-category-rules"
 
 export type FlightTripType = "oneway" | "return"
 
@@ -139,22 +140,8 @@ export function buildFlightProductTitle(params: FlightSearchParams): string {
 }
 
 export function buildFlightSerperQuery(params: FlightSearchParams): string {
-  const pax =
-    params.passengers.adults +
-    params.passengers.children +
-    params.passengers.infants
-  const dates =
-    params.tripType === "return" && params.returnDate
-      ? `${params.departDate} to ${params.returnDate}`
-      : params.departDate
-
-  return [
-    `flights ${params.originCode} to ${params.destinationCode}`,
-    dates,
-    params.cabinClass,
-    `${pax} passenger`,
-    "India price INR credit card offer MakeMyTrip Cleartrip",
-  ].join(" ")
+  const queries = buildFlightShoppingQueries(params)
+  return queries[0] ?? `flights ${params.originCode} to ${params.destinationCode}`
 }
 
 export function buildFlightReferenceUrl(params: FlightSearchParams): string {

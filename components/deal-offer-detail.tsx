@@ -1,8 +1,14 @@
 "use client"
 
-import { AlertCircle, CheckCircle2, Users } from "lucide-react"
+import { useState } from "react"
+import { AlertCircle, CheckCircle2, ChevronDown, Users } from "lucide-react"
 import type { DealOffer } from "@/lib/deal-search"
 import { formatInr } from "@/lib/deal-offer-breakdown"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 
 type DealOfferDetailProps = {
@@ -49,6 +55,11 @@ export function DealOfferDetail({
 }: DealOfferDetailProps) {
   const hasPrice = offer.list_price != null
   const terms = offer.terms_and_conditions ?? []
+  const [termsOpen, setTermsOpen] = useState(false)
+  const actionable =
+    offer.qualifies !== false &&
+    !offer.platform_mismatch &&
+    offer.discount_amount > 0
 
   return (
     <div
@@ -75,7 +86,13 @@ export function DealOfferDetail({
               Serper verified
             </span>
           ) : null}
-          {offer.qualifies === false ? (
+          {offer.platform_mismatch ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
+              <AlertCircle className="h-3 w-3" />
+              Wrong store
+            </span>
+          ) : null}
+          {offer.qualifies === false && !offer.platform_mismatch ? (
             <span className="inline-flex items-center gap-1 rounded-md bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-300">
               <AlertCircle className="h-3 w-3" />
               Min spend not met
@@ -167,14 +184,24 @@ export function DealOfferDetail({
                 valueClassName="text-emerald-200"
               />
             </>
+          ) : actionable ? (
+            <>
+              <div className="my-1 border-t border-slate-800/60" />
+              <BreakdownRow
+                label="Your effective cost after cashback"
+                value={formatInr(offer.effective_cost ?? offer.amount_to_pay)}
+                emphasize
+                valueClassName="text-emerald-200"
+              />
+            </>
           ) : (
             <>
               <div className="my-1 border-t border-slate-800/60" />
               <BreakdownRow
-                label="Your effective cost (100% cashback)"
-                value={formatInr(offer.effective_cost ?? offer.amount_to_pay)}
+                label="You pay (no card discount applied)"
+                value={formatInr(offer.list_price ?? offer.amount_to_pay)}
                 emphasize
-                valueClassName="text-emerald-200"
+                valueClassName="text-slate-300"
               />
             </>
           )}
@@ -191,22 +218,27 @@ export function DealOfferDetail({
       ) : null}
 
       {terms.length > 0 && !compact ? (
-        <div className="rounded-lg border border-slate-800/50 bg-slate-950/20 p-2.5">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            Terms &amp; conditions to avail discount
-          </p>
-          <ul className="space-y-1.5">
-            {terms.map((term, index) => (
-              <li
-                key={`${offer.card_id}-term-${index}`}
-                className="flex gap-2 text-[11px] leading-relaxed text-slate-400"
-              >
-                <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-slate-600" />
-                <span>{term}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Collapsible open={termsOpen} onOpenChange={setTermsOpen}>
+          <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-slate-800/50 bg-slate-950/20 px-2.5 py-2 text-left">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 group-hover:text-slate-400">
+              Card terms ({terms.length})
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2 rounded-lg border border-slate-800/50 bg-slate-950/20 p-2.5">
+            <ul className="space-y-1.5">
+              {terms.slice(0, 8).map((term, index) => (
+                <li
+                  key={`${offer.card_id}-term-${index}`}
+                  className="flex gap-2 text-[11px] leading-relaxed text-slate-400"
+                >
+                  <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-slate-600" />
+                  <span>{term}</span>
+                </li>
+              ))}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
       ) : null}
     </div>
   )

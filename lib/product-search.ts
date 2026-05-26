@@ -1,3 +1,5 @@
+import { buildProductSerperQuery as buildProductSerperQueryFromRules } from "@/lib/search-category-rules"
+
 export type ProductSort = "best_card" | "cheapest"
 
 export type ProductSearchParams = {
@@ -26,12 +28,7 @@ export function defaultProductSearchParams(): ProductSearchParams {
 }
 
 export function buildProductSerperQuery(params: ProductSearchParams): string {
-  const q = params.query.trim()
-  return [
-    q,
-    "buy online India",
-    "Amazon Flipkart price INR credit card offer",
-  ].join(" ")
+  return buildProductSerperQueryFromRules(params)
 }
 
 export function buildProductReferenceUrl(params: ProductSearchParams): string {

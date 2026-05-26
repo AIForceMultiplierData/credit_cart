@@ -97,6 +97,11 @@ export function TravelListingsPanel({
                   <p className="mt-0.5 line-clamp-2 text-xs text-slate-300">
                     {listing.title}
                   </p>
+                  {listing.variant_label ? (
+                    <p className="text-[11px] font-medium text-sky-300/90">
+                      {listing.variant_label}
+                    </p>
+                  ) : null}
                   <p className="text-[11px] text-slate-500">{listing.subtitle}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {listing.meta.map((m) => (

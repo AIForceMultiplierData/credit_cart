@@ -1,25 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import {
-  Hotel,
-  Loader2,
-  Package,
-  Plane,
-  Search,
-  Sparkles,
-} from "lucide-react"
+import { Loader2, Search, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import type { Deal } from "@/components/deals-feed"
 import { useAuth } from "@/hooks/useAuth"
 import { useDealSearchCards } from "@/hooks/useDealSearchCards"
+import type { DealSearchHistoryEntry } from "@/lib/deals-search-history-store"
 import type { DealSearchCategory, DealSearchResult } from "@/lib/deal-search"
 import {
   defaultFlightSearchParams,
@@ -46,8 +34,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-
 const DEAL_FINDER_HELP_ITEMS = [
   "Product → search name, compare stores, rank cards",
   "Flights / hotels → rank cards, book on OTA (pre-filled link)",
@@ -56,19 +42,33 @@ const DEAL_FINDER_HELP_ITEMS = [
 ] as const
 
 type DealSearchBarProps = {
+  category: DealSearchCategory
+  onCategoryChange: (category: DealSearchCategory) => void
   onNeedWallet?: () => void
   onNeedSignIn?: () => void
+  onNavigate?: (tab: "deals" | "wallet") => void
+  onPingFromSearch?: (deal: Deal) => void
 }
 
-const CATEGORY_OPTIONS: Array<{
-  value: DealSearchCategory
-  label: string
-  icon: typeof Plane
-}> = [
-  { value: "flight", label: "Flight", icon: Plane },
-  { value: "hotels", label: "Hotels", icon: Hotel },
-  { value: "product", label: "Product", icon: Package },
-]
+function dealFromSearchResult(result: DealSearchResult): Deal {
+  const price = result.estimated_price ?? 0
+  const best = result.best_offer
+  return {
+    id: `search-${Date.now()}`,
+    title: result.product_title,
+    originalPrice: price,
+    discountedPrice: best?.amount_to_pay ?? price,
+    cardName: best?.card_name ?? "Split with circle",
+    cardDiscount: best?.discount_amount ?? 0,
+    timeLeft: "48h",
+    platform: result.platform,
+    cardId: best?.card_id,
+    cardBankName: best?.bank_name,
+    cardFullName: best?.card_name,
+    discountPercent: best?.discount_percent,
+    splitHint: "50/50 pool from your search",
+  }
+}
 
 const LISTING_CATEGORIES = new Set<DealSearchCategory>([
   "flight",
@@ -77,14 +77,17 @@ const LISTING_CATEGORIES = new Set<DealSearchCategory>([
 ])
 
 export function DealSearchBar({
+  category,
+  onCategoryChange,
   onNeedWallet,
   onNeedSignIn,
+  onNavigate,
+  onPingFromSearch,
 }: DealSearchBarProps) {
-  const { user, loading: authLoading } = useAuth()
+  const { user, session, loading: authLoading } = useAuth()
   const { openLeadForm } = useCardLead()
   const { searchCards, walletCount, circleCount, loading: cardsLoading } =
     useDealSearchCards(user?.id)
-  const [category, setCategory] = useState<DealSearchCategory>("flight")
   const [flightSearch, setFlightSearch] = useState<FlightSearchParams>(
     defaultFlightSearchParams
   )
@@ -96,7 +99,34 @@ export function DealSearchBar({
   )
   const [searching, setSearching] = useState(false)
   const [result, setResult] = useState<DealSearchResult | null>(null)
+  const [history, setHistory] = useState<DealSearchHistoryEntry[]>([])
   const [helpOpen, setHelpOpen] = useState(false)
+
+  const loadHistory = useCallback(async () => {
+    const token = session?.access_token
+    if (!user || !token) {
+      setHistory([])
+      return
+    }
+    try {
+      const res = await fetch("/api/deals/search-history?limit=15", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const payload = (await res.json()) as {
+        history?: DealSearchHistoryEntry[]
+        error?: string
+      }
+      if (res.ok && payload.history) {
+        setHistory(payload.history)
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }, [user, session?.access_token])
+
+  useEffect(() => {
+    void loadHistory()
+  }, [loadHistory])
 
   const showHelpTooltip = useCallback(() => {
     setHelpOpen(true)
@@ -109,9 +139,16 @@ export function DealSearchBar({
   }, [helpOpen])
 
   async function runSearch(body: Record<string, unknown>) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`
+    }
+
     const response = await fetch("/api/deals/search", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     })
 
@@ -124,7 +161,24 @@ export function DealSearchBar({
     }
 
     setResult(payload)
+    void loadHistory()
     toast.success("Results ready", { description: payload.summary })
+  }
+
+  function replayHistoryEntry(entry: DealSearchHistoryEntry) {
+    onCategoryChange(entry.category)
+    setResult(entry.result_payload)
+    const rb = entry.request_body
+    if (entry.category === "flight" && rb.flightSearch) {
+      setFlightSearch(rb.flightSearch as FlightSearchParams)
+    }
+    if (entry.category === "hotels" && rb.hotelSearch) {
+      setHotelSearch(rb.hotelSearch as HotelSearchParams)
+    }
+    if (entry.category === "product" && rb.productSearch) {
+      setProductSearch(rb.productSearch as ProductSearchParams)
+    }
+    toast.message("Restored search", { description: entry.search_label })
   }
 
   async function handleSearch() {
@@ -262,37 +316,6 @@ export function DealSearchBar({
           </TooltipContent>
         </Tooltip>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Select
-            value={category}
-            onValueChange={(value) =>
-              setCategory(value as DealSearchCategory)
-            }
-          >
-            <SelectTrigger
-              className={cn(
-                "h-11 w-full shrink-0 border-slate-700 bg-slate-950 text-slate-50 sm:w-[130px]",
-                "focus-visible:border-emerald-400 focus-visible:ring-emerald-400/30"
-              )}
-            >
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent className="border-slate-800 bg-slate-900 text-slate-50">
-              {CATEGORY_OPTIONS.map((option) => {
-                const Icon = option.icon
-                return (
-                  <SelectItem key={option.value} value={option.value}>
-                    <span className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-emerald-400" />
-                      {option.label}
-                    </span>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
         {category === "flight" ? (
           <div className="mt-3 min-w-0 overflow-hidden">
             <FlightSearchForm
@@ -342,10 +365,43 @@ export function DealSearchBar({
             {walletCount + circleCount === 1 ? "" : "s"}
           </p>
         ) : null}
+
+        {history.length > 0 ? (
+          <div className="mt-3 border-t border-slate-800/60 pt-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Recent searches
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {history.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() => replayHistoryEntry(entry)}
+                  className="max-w-full truncate rounded-lg border border-slate-700/80 bg-slate-950/60 px-2 py-1 text-[11px] text-slate-300 hover:border-emerald-500/40 hover:text-emerald-200"
+                  title={new Date(entry.created_at).toLocaleString("en-IN")}
+                >
+                  {entry.search_label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {result ? (
-        <DealSearchResults
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <p className="text-xs font-medium text-slate-400">Search results</p>
+            <button
+              type="button"
+              onClick={() => setResult(null)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[11px] font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            >
+              <X className="h-3 w-3" />
+              Close
+            </button>
+          </div>
+          <DealSearchResults
           result={result}
           flightSearch={category === "flight" ? flightSearch : null}
           hotelSearch={category === "hotels" ? hotelSearch : null}
@@ -367,7 +423,16 @@ export function DealSearchBar({
                   })
               : undefined
           }
+          onPingSplit={() => {
+            if (onPingFromSearch) {
+              onPingFromSearch(dealFromSearchResult(result))
+            } else {
+              onNavigate?.("deals")
+            }
+          }}
+          onBrowseLenders={() => onNavigate?.("deals")}
         />
+        </div>
       ) : null}
     </div>
   )

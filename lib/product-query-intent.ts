@@ -19,6 +19,13 @@ const ACCESSORY_PATTERNS = [
   /\bback\s*cover\b/i,
   /\bcase\s+for\b/i,
   /\bcover\s+for\b/i,
+  /\bcompatible\s+with\b/i,
+  /\bfor\s+iphone\b/i,
+  /\bfor\s+galaxy\b/i,
+  /\bfor\s+pixel\b/i,
+  /\bmagnetic\s+back\b/i,
+  /\bmagsafe\s+case\b/i,
+  /\bsilicone\b/i,
   /\bflip\s*cover\b/i,
   /\btempered\s*glass\b/i,
   /\bscreen\s*guard\b/i,
@@ -48,13 +55,17 @@ export function inferProductIntent(query: string): ProductIntent {
   const q = query.toLowerCase().replace(/\s+/g, " ").trim()
 
   if (
-    /\biphone\b|\bgalaxy\s*(s|z|a|m)?\d|\bpixel\s*\d|\boneplus\b|\bnothing\s*phone|\biqoo\b|\breno\b|\bvivo\s*x|\bredmi\b|\brealme\s*\d|\bmotorola\s*edge/i.test(
+    /\biphone\b|\bgalaxy\s*(s|z|a|m)?\d|\bz\s*fold\b|\bfold\s*[67]\b|\bsamsung\s*fold\b|\bpixel\s*\d|\boneplus\b|\bnothing\s*phone|\biqoo\b|\breno\b|\bvivo\s*x|\bredmi\b|\brealme\s*\d|\bmotorola\s*edge/i.test(
       q
     )
   ) {
+    const isPremiumPhone =
+      /\biphone\s*(1[0-9]|[6-9])\b|\biphone\s*pro\b|\biphone\s*air\b|\bgalaxy\s*s2[4-9]\b|\bgalaxy\s*z\s*fold\b|\bgalaxy\s*z\s*flip\b|\bz\s*fold\s*[67]\b|\bsamsung\s*galaxy\s*z\s*fold\b|\bpixel\s*[89]\b/i.test(
+        q
+      )
     return {
       kind: "phone",
-      minPrice: 8_000,
+      minPrice: isPremiumPhone ? 45_000 : 8_000,
       maxPrice: 250_000,
       excludeTitlePatterns: ACCESSORY_PATTERNS,
     }
@@ -120,7 +131,36 @@ export function inferProductIntent(query: string): ProductIntent {
 }
 
 export function isAccessoryListing(title: string, intent: ProductIntent): boolean {
-  return intent.excludeTitlePatterns.some((p) => p.test(title))
+  const t = title.toLowerCase()
+  if (intent.excludeTitlePatterns.some((p) => p.test(title))) return true
+  if (intent.kind !== "phone") return false
+  if (/\b(case|cover|skin|pouch|strap|guard|bumper)\b/i.test(t)) return true
+  if (/\bcompatible\b/i.test(t) && /\b(iphone|galaxy|pixel|oneplus)\b/i.test(t)) {
+    return true
+  }
+  return false
+}
+
+/** True when title looks like a handset, not an accessory */
+export function isPhoneDeviceListing(title: string, intent: ProductIntent): boolean {
+  if (intent.kind !== "phone") return true
+  if (isAccessoryListing(title, intent)) return false
+  const t = title.toLowerCase()
+  if (/\b(smartphone|mobile\s*phone|5g\s*phone|cell\s*phone)\b/i.test(t)) {
+    return true
+  }
+  if (/\b(128gb|256gb|512gb|1tb)\b/i.test(t) && !/\b(case|cover)\b/i.test(t)) {
+    return true
+  }
+  if (
+    /\b(iphone|galaxy\s*(s|z|a)?\d|z\s*fold|fold\s*[67]|pixel\s*\d|oneplus\s*\d|nothing\s*phone)\b/i.test(
+      t
+    ) &&
+    !/\b(for|compatible|case|cover|silicone|magnetic)\b/i.test(t)
+  ) {
+    return true
+  }
+  return false
 }
 
 export function titleMatchesQuery(title: string, query: string): boolean {

@@ -133,8 +133,12 @@ export function TravelBookCta(props: AffiliateBookCtaProps) {
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
             {category === "product"
-              ? "Checkout with your best card"
-              : "Book with your best card"}
+              ? bestCardLabel
+                ? "Checkout with your best card"
+                : "Buy on store"
+              : bestCardLabel
+                ? "Book with your best card"
+                : "Book on partner site"}
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
             {headline}. Rank cards in PoolPay first — then complete purchase on

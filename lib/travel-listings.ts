@@ -15,6 +15,11 @@ import {
   fetchSerperShopping,
   parseInrPrice,
 } from "@/lib/serper-client"
+import type { ListingsFetchResult } from "@/lib/product-listings"
+import {
+  buildFlightShoppingQueries,
+  buildHotelShoppingQueries,
+} from "@/lib/search-category-rules"
 import {
   flightRouteBounds,
   flightTitleMatchesRoute,
@@ -25,6 +30,8 @@ import {
   isJunkFlightTitle,
   isJunkHotelTitle,
 } from "@/lib/travel-query-intent"
+
+export type { ListingsFetchResult }
 
 export type { TravelListing }
 
@@ -410,24 +417,42 @@ function finalizeHotelListings(
   }))
 }
 
+function listingFromSerperFlightRaw(
+  item: { title?: string; price?: string; source?: string; link?: string },
+  params: FlightSearchParams,
+  index: number,
+  bookUrl: string,
+  provider: string
+): TravelListing | null {
+  const price = parseInrPrice(item.price)
+  if (!price) return null
+  const title = item.title?.trim() || `${params.originCode} → ${params.destinationCode}`
+  return {
+    id: `flt-raw-${index}`,
+    category: "flight",
+    provider,
+    title,
+    subtitle: "Raw Serper fare",
+    price,
+    meta: ["Raw Serper", provider],
+    refundable: true,
+    product_url: item.link?.trim() || bookUrl,
+  }
+}
+
 export async function fetchFlightListings(
   params: FlightSearchParams
-): Promise<TravelListing[]> {
-  const route = `${params.originCode}-${params.destinationCode}`
+): Promise<ListingsFetchResult> {
   const listings: TravelListing[] = [
     ...generateOtaFlightListings(params),
     ...generateAirlineFlightListings(params),
   ]
+  const raw_listings: TravelListing[] = [...listings]
+  const serper_queries = buildFlightShoppingQueries(params)
 
   if (SERPER_API_KEYS.length > 0) {
-    const depart = params.departDate
-    const queries = [
-      `flights ${route} ${depart} India makemytrip`,
-      `flights ${route} ${depart} cleartrip price`,
-      `${params.originCode} to ${params.destinationCode} flight fare ${depart}`,
-    ]
     const batches = await Promise.all(
-      queries.map((q) => fetchSerperShopping(q, 4))
+      serper_queries.map((q) => fetchSerperShopping(q, 4))
     )
     let idx = 0
     for (const batch of batches) {
@@ -446,6 +471,8 @@ export async function fetchFlightListings(
             : provider === "Goibibo"
               ? buildGoibiboFlightUrl(params)
               : buildMakeMyTripFlightUrl(params)
+        const raw = listingFromSerperFlightRaw(item, params, idx, bookUrl, provider)
+        if (raw) raw_listings.push(raw)
         const row = listingFromSerperFlight(item, params, idx, bookUrl, provider)
         if (row) listings.push(row)
         idx += 1
@@ -453,26 +480,50 @@ export async function fetchFlightListings(
     }
   }
 
-  return finalizeFlightListings(listings, params)
+  return {
+    listings: finalizeFlightListings(listings, params),
+    raw_listings,
+    serper_queries,
+  }
+}
+
+function listingFromSerperHotelRaw(
+  item: { title?: string; price?: string; source?: string; link?: string },
+  params: HotelSearchParams,
+  index: number,
+  bookUrl: string,
+  provider: string
+): TravelListing | null {
+  const price = parseInrPrice(item.price)
+  if (!price) return null
+  const dest = params.destination || params.city
+  const title = item.title?.trim() || `Hotel · ${dest}`
+  return {
+    id: `htl-raw-${index}`,
+    category: "hotels",
+    provider,
+    title,
+    subtitle: "Raw Serper rate",
+    price,
+    meta: ["Raw Serper", provider],
+    refundable: true,
+    product_url: item.link?.trim() || bookUrl,
+  }
 }
 
 export async function fetchHotelListings(
   params: HotelSearchParams
-): Promise<TravelListing[]> {
-  const dest = params.destination || params.city
+): Promise<ListingsFetchResult> {
   const listings: TravelListing[] = [
     ...generateOtaHotelListings(params),
     ...generateChainHotelListings(params),
   ]
+  const raw_listings: TravelListing[] = [...listings]
+  const serper_queries = buildHotelShoppingQueries(params)
 
   if (SERPER_API_KEYS.length > 0) {
-    const queries = [
-      `hotels ${dest} ${params.checkIn} booking.com`,
-      `hotels ${dest} makemytrip ${params.checkIn}`,
-      `${dest} hotel ${params.checkIn} to ${params.checkOut} agoda`,
-    ]
     const batches = await Promise.all(
-      queries.map((q) => fetchSerperShopping(q, 4))
+      serper_queries.map((q) => fetchSerperShopping(q, 4))
     )
     let idx = 0
     for (const batch of batches) {
@@ -495,6 +546,8 @@ export async function fetchHotelListings(
               : provider === "Cleartrip"
                 ? buildCleartripHotelUrl(params)
                 : buildBookingHotelUrl(params)
+        const raw = listingFromSerperHotelRaw(item, params, idx, bookUrl, provider)
+        if (raw) raw_listings.push(raw)
         const row = listingFromSerperHotel(item, params, idx, bookUrl, provider)
         if (row) listings.push(row)
         idx += 1
@@ -502,7 +555,11 @@ export async function fetchHotelListings(
     }
   }
 
-  return finalizeHotelListings(listings, params)
+  return {
+    listings: finalizeHotelListings(listings, params),
+    raw_listings,
+    serper_queries,
+  }
 }
 
 /** @deprecated Use fetchFlightListings */
@@ -510,7 +567,10 @@ export function generateFlightListings(
   params: FlightSearchParams
 ): TravelListing[] {
   return finalizeFlightListings(
-    [...generateOtaFlightListings(params), ...generateAirlineFlightListings(params)],
+    [
+      ...generateOtaFlightListings(params),
+      ...generateAirlineFlightListings(params),
+    ],
     params
   )
 }

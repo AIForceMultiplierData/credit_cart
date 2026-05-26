@@ -1,3 +1,5 @@
+import { buildHotelShoppingQueries } from "@/lib/search-category-rules"
+
 export type HotelSort = "best_card" | "cheapest" | "rating"
 
 export type HotelGuests = {
@@ -113,13 +115,8 @@ export function buildHotelProductTitle(params: HotelSearchParams): string {
 }
 
 export function buildHotelSerperQuery(params: HotelSearchParams): string {
-  return [
-    `hotels ${params.destination || params.city} India`,
-    params.checkIn,
-    params.checkOut,
-    `${params.rooms} room`,
-    "booking price INR credit card offer MakeMyTrip Booking.com OYO",
-  ].join(" ")
+  const queries = buildHotelShoppingQueries(params)
+  return queries[0] ?? `hotels ${params.destination || params.city} India`
 }
 
 export function buildHotelReferenceUrl(params: HotelSearchParams): string {

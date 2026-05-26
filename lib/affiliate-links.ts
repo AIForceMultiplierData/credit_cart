@@ -538,5 +538,8 @@ export function primaryAffiliateBookLabel(
     return `Apply card & search on Booking.com${card}`
   }
   const store = platform?.trim() || "store"
+  if (!card) {
+    return `Open ${store} to buy — no qualifying card offer in your wallet`
+  }
   return `Apply card & checkout on ${store}${card}`
 }
