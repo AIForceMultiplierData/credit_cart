@@ -33,9 +33,9 @@ export function TravelListingsPanel({
     category === "flight" ? Plane : category === "hotels" ? Hotel : Package
   const label =
     category === "flight"
-      ? "Live flight picks"
+      ? "Flights · OTAs & airlines"
       : category === "hotels"
-        ? "Live hotel picks"
+        ? "Hotels · OTAs & chains"
         : "Phones & gadgets · major stores only"
 
   return (
@@ -52,14 +52,21 @@ export function TravelListingsPanel({
       <p className="text-[11px] leading-relaxed text-slate-500">
         {category === "product"
           ? "We hide cases, rentals & junk prices. Tap a real phone listing (Amazon, Flipkart, Croma…) to rank cards."
-          : "Tap a result to lock fare for card ranking. Book on OTAs via buttons below — route and dates pre-filled."}
+          : category === "flight"
+            ? "Visa, bus & junk fares hidden. Tap MakeMyTrip, Cleartrip, or an airline — route & dates pre-filled."
+            : "Hourly stays & junk rates hidden. Tap Booking.com, MakeMyTrip, or a hotel — dates & guests pre-filled."}
       </p>
 
       <div className="space-y-2">
         {listings.map((listing) => {
           const selected = listing.id === selectedId
           const shopHref =
-            category === "product" ? productListingHref(listing) : null
+            category === "product"
+              ? productListingHref(listing)
+              : listing.product_url &&
+                  !/google\./i.test(listing.product_url)
+                ? listing.product_url
+                : null
 
           return (
             <div
@@ -120,7 +127,7 @@ export function TravelListingsPanel({
                   )}
                 </div>
               </button>
-              {shopHref && category === "product" ? (
+              {shopHref ? (
                 <a
                   href={shopHref}
                   target="_blank"
@@ -128,7 +135,9 @@ export function TravelListingsPanel({
                   className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900/80 py-2 text-[11px] font-semibold text-emerald-300 hover:bg-slate-800"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  Buy on {listing.provider}
+                  {category === "product"
+                    ? `Buy on ${listing.provider}`
+                    : `Book on ${listing.provider}`}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               ) : null}

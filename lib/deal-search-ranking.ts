@@ -95,6 +95,12 @@ export function capDiscountPercentForStore(
   else if (/amazon/.test(p) && /amazon|icici/.test(label)) cap = 5
   else if (/croma/.test(p) && /croma|tata/.test(label)) cap = 10
   else if (/myntra/.test(p) && /myntra|sbi/.test(label)) cap = 10
+  else if (
+    /makemytrip|cleartrip|goibibo|booking|agoda|travel/i.test(p) &&
+    /regalia|diners|magnus|millennia|travel|sapphiro/i.test(label)
+  ) {
+    cap = 10
+  }
 
   if (serperPercent === null) return cap
   return Math.min(serperPercent, cap)

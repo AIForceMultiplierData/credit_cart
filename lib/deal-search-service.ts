@@ -48,9 +48,10 @@ import {
   type ProductSearchParams,
 } from "@/lib/product-search"
 import {
-  generateFlightListings,
-  generateHotelListings,
-  resolveTravelPrice,
+  fetchFlightListings,
+  fetchHotelListings,
+  resolveFlightListing,
+  resolveHotelListing,
 } from "@/lib/travel-listings"
 import {
   fetchSerperDealContext,
@@ -76,54 +77,70 @@ export type DealSearchOverrides = {
   platform?: string
 }
 
-function buildTravelOverrides(
-  category: DealSearchCategory,
-  flight: FlightSearchParams | null,
-  hotel: HotelSearchParams | null
-): DealSearchOverrides | { error: string } {
-  if (category === "flight" && flight) {
-    const listings = generateFlightListings(flight)
-    const price = resolveTravelPrice(
-      listings,
-      flight.estimatedFare,
-      flight.selectedListingId
-    )
-    if (price === null) {
-      return { error: "Pick a flight or enter total fare (₹) for card ranking." }
-    }
+export async function buildFlightOverrides(
+  flight: FlightSearchParams
+): Promise<DealSearchOverrides & { url: string } | { error: string }> {
+  const listings = await fetchFlightListings(flight)
+  const { listing, price } = resolveFlightListing(
+    listings,
+    flight.estimatedFare,
+    flight.selectedListingId,
+    flight
+  )
+
+  if (price === null) {
     return {
-      productTitle: buildFlightProductTitle(flight),
-      estimatedPrice: price,
-      serperQuery: buildFlightSerperQuery(flight),
-      travelListings: listings,
-      selectedTravelListingId:
-        flight.selectedListingId ?? listings[0]?.id ?? null,
+      error:
+        "Pick a flight or OTA listing below, or enter total fare (₹) for card ranking.",
     }
   }
 
-  if (category === "hotels" && hotel) {
-    const listings = generateHotelListings(hotel)
-    const price = resolveTravelPrice(
-      listings,
-      hotel.estimatedTotal,
-      hotel.selectedListingId
-    )
-    if (price === null) {
-      return {
-        error: "Pick a hotel or enter total stay price (₹) for card ranking.",
-      }
-    }
+  const selected = listing ?? listings[0]
+  const url = buildFlightReferenceUrl(flight)
+
+  return {
+    productTitle: buildFlightProductTitle(flight),
+    estimatedPrice: price,
+    serperQuery: buildFlightSerperQuery(flight),
+    travelListings: listings,
+    selectedTravelListingId:
+      flight.selectedListingId ?? selected?.id ?? listings[0]?.id ?? null,
+    platform: selected?.provider ?? "Travel",
+    url,
+  }
+}
+
+export async function buildHotelOverrides(
+  hotel: HotelSearchParams
+): Promise<DealSearchOverrides & { url: string } | { error: string }> {
+  const listings = await fetchHotelListings(hotel)
+  const { listing, price } = resolveHotelListing(
+    listings,
+    hotel.estimatedTotal,
+    hotel.selectedListingId,
+    hotel
+  )
+
+  if (price === null) {
     return {
-      productTitle: buildHotelProductTitle(hotel),
-      estimatedPrice: price,
-      serperQuery: buildHotelSerperQuery(hotel),
-      travelListings: listings,
-      selectedTravelListingId:
-        hotel.selectedListingId ?? listings[0]?.id ?? null,
+      error:
+        "Pick a hotel or OTA listing below, or enter total stay price (₹) for card ranking.",
     }
   }
 
-  return { error: "Invalid travel search." }
+  const selected = listing ?? listings[0]
+  const url = buildHotelReferenceUrl(hotel)
+
+  return {
+    productTitle: buildHotelProductTitle(hotel),
+    estimatedPrice: price,
+    serperQuery: buildHotelSerperQuery(hotel),
+    travelListings: listings,
+    selectedTravelListingId:
+      hotel.selectedListingId ?? selected?.id ?? listings[0]?.id ?? null,
+    platform: selected?.provider ?? "Travel",
+    url,
+  }
 }
 
 export async function buildProductOverrides(
@@ -660,9 +677,9 @@ export async function parseSearchRequestBody(body: SearchRequestBody): Promise<
     if (!valid.ok) {
       return { error: valid.message }
     }
-    url = buildFlightReferenceUrl(flight)
-    const travel = buildTravelOverrides("flight", flight, null)
+    const travel = await buildFlightOverrides(flight)
     if ("error" in travel) return { error: travel.error }
+    url = travel.url
     overrides = travel
   }
 
@@ -681,9 +698,9 @@ export async function parseSearchRequestBody(body: SearchRequestBody): Promise<
     if (!valid.ok) {
       return { error: valid.message }
     }
-    url = buildHotelReferenceUrl(hotel)
-    const travel = buildTravelOverrides("hotels", null, hotel)
+    const travel = await buildHotelOverrides(hotel)
     if ("error" in travel) return { error: travel.error }
+    url = travel.url
     overrides = travel
   }
 

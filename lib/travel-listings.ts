@@ -1,6 +1,30 @@
 import type { TravelListing } from "@/lib/deal-search"
+import {
+  buildAgodaHotelUrl,
+  buildBookingHotelUrl,
+  buildCleartripFlightUrl,
+  buildCleartripHotelUrl,
+  buildGoibiboFlightUrl,
+  buildMakeMyTripFlightUrl,
+  buildMakeMyTripHotelUrl,
+} from "@/lib/affiliate-links"
 import type { FlightSearchParams } from "@/lib/flight-search"
 import type { HotelSearchParams } from "@/lib/hotel-search"
+import { SERPER_API_KEYS } from "@/lib/llm-router"
+import {
+  fetchSerperShopping,
+  parseInrPrice,
+} from "@/lib/serper-client"
+import {
+  flightRouteBounds,
+  flightTitleMatchesRoute,
+  flightTotalBounds,
+  hotelNightCount,
+  hotelStayBounds,
+  hotelTitleMatchesDestination,
+  isJunkFlightTitle,
+  isJunkHotelTitle,
+} from "@/lib/travel-query-intent"
 
 export type { TravelListing }
 
@@ -18,24 +42,20 @@ function seededPrice(seed: number, min: number, spread: number): number {
   return Math.round(min + n * spread)
 }
 
-const FLIGHT_TEMPLATES = [
+const FLIGHT_AIRLINES = [
   { airline: "IndiGo", code: "6E", duration: "2h 35m", dep: "06:15", arr: "08:50" },
   { airline: "Air India", code: "AI", duration: "2h 45m", dep: "09:40", arr: "12:25" },
   { airline: "Akasa Air", code: "QP", duration: "2h 30m", dep: "14:05", arr: "16:35" },
   { airline: "Air India Express", code: "IX", duration: "2h 50m", dep: "18:20", arr: "21:10" },
   { airline: "SpiceJet", code: "SG", duration: "2h 40m", dep: "21:00", arr: "23:40" },
-  { airline: "Vistara", code: "UK", duration: "2h 35m", dep: "11:30", arr: "14:05" },
 ]
 
-const HOTEL_TEMPLATES = [
-  { chain: "OYO", stars: 3, area: "City centre" },
-  { chain: "Treebo", stars: 3, area: "Near station" },
-  { chain: "FabHotels", stars: 3, area: "Business district" },
-  { chain: "Lemon Tree", stars: 4, area: "Airport road" },
+const HOTEL_CHAINS = [
+  { chain: "Lemon Tree", stars: 4, area: "City centre" },
   { chain: "ITC", stars: 5, area: "Downtown" },
   { chain: "Taj", stars: 5, area: "Heritage quarter" },
-  { chain: "Marriott", stars: 5, area: "Convention hub" },
-  { chain: "ibis", stars: 3, area: "Metro corridor" },
+  { chain: "Marriott", stars: 5, area: "Business district" },
+  { chain: "Treebo", stars: 3, area: "Near station" },
 ]
 
 function timeSlotMatches(slot: FlightSearchParams["timeSlot"], dep: string): boolean {
@@ -59,41 +79,172 @@ function airlineIdForName(name: string): string {
   return map[name] ?? name.toLowerCase().replace(/\s+/g, "_")
 }
 
-export function generateFlightListings(params: FlightSearchParams): TravelListing[] {
+function scoreFlightListing(
+  listing: TravelListing,
+  params: FlightSearchParams
+): number {
+  const bounds = flightTotalBounds(params)
+  if (isJunkFlightTitle(listing.title)) return -1_000
+  if (listing.price < bounds.min || listing.price > bounds.max) return -500
+  if (!flightTitleMatchesRoute(listing.title, params.originCode, params.destinationCode)) {
+    return -300
+  }
+  let score = 50
+  if (/makemytrip|cleartrip|goibibo|booking/i.test(listing.provider)) score += 90
+  if (listing.product_url && !/google\./i.test(listing.product_url)) score += 40
+  if (FLIGHT_AIRLINES.some((a) => a.airline === listing.provider)) score += 60
+  return score
+}
+
+function scoreHotelListing(
+  listing: TravelListing,
+  params: HotelSearchParams
+): number {
+  const dest = params.destination || params.city
+  const bounds = hotelStayBounds(params)
+  if (isJunkHotelTitle(listing.title)) return -1_000
+  if (listing.price < bounds.minTotal || listing.price > bounds.maxTotal) {
+    return -500
+  }
+  if (!hotelTitleMatchesDestination(listing.title, dest)) return -250
+  let score = 50
+  if (/booking|makemytrip|agoda|cleartrip|oyo|taj|itc|marriott/i.test(listing.provider)) {
+    score += 70
+  }
+  if (listing.product_url && !/google\./i.test(listing.product_url)) score += 40
+  return score
+}
+
+function listingFromSerperFlight(
+  item: { title?: string; price?: string; source?: string; link?: string },
+  params: FlightSearchParams,
+  index: number,
+  bookUrl: string,
+  provider: string
+): TravelListing | null {
+  const price = parseInrPrice(item.price)
+  if (!price) return null
+  const title = item.title?.trim() || `${params.originCode} → ${params.destinationCode}`
+  if (isJunkFlightTitle(title)) return null
+
+  const listing: TravelListing = {
+    id: `flt-serper-${provider}-${index}`,
+    category: "flight",
+    provider,
+    title,
+    subtitle: `${params.originCode} → ${params.destinationCode} · book on ${provider}`,
+    price,
+    meta: ["Live fare", provider],
+    refundable: true,
+    product_url: /google\./i.test(item.link ?? "") ? bookUrl : item.link?.trim() || bookUrl,
+  }
+
+  return scoreFlightListing(listing, params) >= 0 ? listing : null
+}
+
+function listingFromSerperHotel(
+  item: { title?: string; price?: string; source?: string; link?: string },
+  params: HotelSearchParams,
+  index: number,
+  bookUrl: string,
+  provider: string
+): TravelListing | null {
+  const price = parseInrPrice(item.price)
+  if (!price) return null
+  const dest = params.destination || params.city
+  const title = item.title?.trim() || `Hotel · ${dest}`
+  if (isJunkHotelTitle(title)) return null
+
+  const listing: TravelListing = {
+    id: `htl-serper-${provider}-${index}`,
+    category: "hotels",
+    provider,
+    title,
+    subtitle: `${dest} · ${hotelNightCount(params)} night(s)`,
+    price,
+    meta: ["Live rate", provider],
+    refundable: true,
+    product_url: /google\./i.test(item.link ?? "") ? bookUrl : item.link?.trim() || bookUrl,
+  }
+
+  return scoreHotelListing(listing, params) >= 0 ? listing : null
+}
+
+function generateOtaFlightListings(params: FlightSearchParams): TravelListing[] {
+  const bounds = flightTotalBounds(params)
   const seed = hashSeed([
     params.originCode,
     params.destinationCode,
     params.departDate,
     params.returnDate ?? "",
-    params.tripType,
   ])
-  const pax =
-    params.passengers.adults +
-    params.passengers.children +
-    params.passengers.infants
-  const baseMin = 4200 + (params.originCode.charCodeAt(0) % 5) * 800
+  const mid = Math.round((bounds.min + bounds.max) / 2)
+  const spread = Math.round((bounds.max - bounds.min) / 3)
 
-  let listings: TravelListing[] = FLIGHT_TEMPLATES.map((tpl, i) => {
-    const legPrice = seededPrice(seed + i * 17, baseMin, 14000)
-    const price =
+  const otas = [
+    {
+      provider: "MakeMyTrip",
+      url: buildMakeMyTripFlightUrl(params),
+      price: seededPrice(seed + 1, mid - spread / 2, spread),
+    },
+    {
+      provider: "Cleartrip",
+      url: buildCleartripFlightUrl(params),
+      price: seededPrice(seed + 2, mid - spread / 3, spread),
+    },
+    {
+      provider: "Goibibo",
+      url: buildGoibiboFlightUrl(params),
+      price: seededPrice(seed + 3, mid, spread),
+    },
+  ]
+
+  return otas.map((ota, i) => ({
+    id: `flt-ota-${ota.provider}`,
+    category: "flight" as const,
+    provider: ota.provider,
+    title: `${params.originCode} → ${params.destinationCode} · ${ota.provider}`,
+    subtitle:
       params.tripType === "return" && params.returnDate
-        ? Math.round(legPrice * 1.75)
-        : legPrice
-    const refundable = i % 3 !== 2
+        ? "Round trip · pre-filled on OTA"
+        : "One way · pre-filled on OTA",
+    price: ota.price,
+    meta: ["OTA search", ota.provider],
+    refundable: true,
+    product_url: ota.url,
+    badge: i === 0 ? "Recommended OTA" : undefined,
+  }))
+}
+
+function generateAirlineFlightListings(params: FlightSearchParams): TravelListing[] {
+  const bounds = flightTotalBounds(params)
+  const seed = hashSeed([params.originCode, params.destinationCode, params.departDate])
+  const pax = Math.max(
+    1,
+    params.passengers.adults +
+      params.passengers.children +
+      params.passengers.infants
+  )
+  const { minOneWay, maxOneWay } = flightRouteBounds(params)
+  const spread = maxOneWay - minOneWay
+  const mmtUrl = buildMakeMyTripFlightUrl(params)
+
+  let listings: TravelListing[] = FLIGHT_AIRLINES.map((tpl, i) => {
+    let legPrice = seededPrice(seed + i * 17, minOneWay, spread * 0.35)
+    if (params.tripType === "return" && params.returnDate) {
+      legPrice = Math.round(legPrice * 1.75)
+    }
+    const price = Math.round(legPrice * (pax > 1 ? 0.92 + pax * 0.04 : 1))
     return {
-      id: `flt-${params.originCode}-${params.destinationCode}-${i}`,
+      id: `flt-air-${tpl.code}-${i}`,
       category: "flight" as const,
       provider: tpl.airline,
       title: `${params.originCode} → ${params.destinationCode} · ${tpl.airline}`,
       subtitle: `${tpl.dep} – ${tpl.arr} · ${tpl.duration}`,
-      price: Math.round(price * (pax > 1 ? 0.92 + pax * 0.04 : 1)),
-      meta: [
-        tpl.code,
-        params.tripType === "return" ? "Round trip" : "One way",
-        refundable ? "Refundable" : "Non-refundable",
-      ],
-      refundable,
-      badge: i === 0 ? "Lowest fare" : i === 2 ? "Fastest" : undefined,
+      price,
+      meta: [tpl.code, tpl.airline, "Book via OTA"],
+      refundable: i % 3 !== 2,
+      product_url: mmtUrl,
     }
   })
 
@@ -109,55 +260,64 @@ export function generateFlightListings(params: FlightSearchParams): TravelListin
     listings = listings.filter((l) => l.price <= params.filters.maxPrice!)
   }
   listings = listings.filter((l) => {
-    const tpl = FLIGHT_TEMPLATES.find((t) => t.airline === l.provider)
+    const tpl = FLIGHT_AIRLINES.find((t) => t.airline === l.provider)
     return tpl ? timeSlotMatches(params.timeSlot, tpl.dep) : true
   })
 
-  listings.sort((a, b) => {
-    if (params.sort === "cheapest") return a.price - b.price
-    if (params.sort === "fastest" || params.sort === "shortest") {
-      const da = FLIGHT_TEMPLATES.find((t) => t.airline === a.provider)?.duration ?? ""
-      const db = FLIGHT_TEMPLATES.find((t) => t.airline === b.provider)?.duration ?? ""
-      return da.localeCompare(db)
-    }
-    return a.price - b.price
-  })
-
-  if (listings.length === 0) {
-    return generateFlightListings({
-      ...params,
-      filters: { ...params.filters, airlines: [], hideNonRefundable: false },
-      timeSlot: "any",
-    }).slice(0, 4)
-  }
-
-  return listings.slice(0, 8)
+  return listings.filter((l) => scoreFlightListing(l, params) >= 0)
 }
 
-export function generateHotelListings(params: HotelSearchParams): TravelListing[] {
-  const nights = Math.max(
-    1,
-    Math.ceil(
-      (new Date(`${params.checkOut}T12:00:00`).getTime() -
-        new Date(`${params.checkIn}T12:00:00`).getTime()) /
-        86400000
-    )
-  )
+function generateOtaHotelListings(params: HotelSearchParams): TravelListing[] {
+  const nights = hotelNightCount(params)
+  const bounds = hotelStayBounds(params)
+  const seed = hashSeed([params.destination, params.checkIn, params.checkOut])
+  const mid = Math.round((bounds.minTotal + bounds.maxTotal) / 2)
+  const spread = Math.round((bounds.maxTotal - bounds.minTotal) / 4)
+
+  const otas = [
+    { provider: "Booking.com", url: buildBookingHotelUrl(params), offset: 1 },
+    { provider: "MakeMyTrip", url: buildMakeMyTripHotelUrl(params), offset: 2 },
+    { provider: "Agoda", url: buildAgodaHotelUrl(params), offset: 3 },
+    { provider: "Cleartrip", url: buildCleartripHotelUrl(params), offset: 4 },
+  ]
+
+  return otas.map((ota, i) => ({
+    id: `htl-ota-${ota.provider}`,
+    category: "hotels" as const,
+    provider: ota.provider,
+    title: `${params.destination || params.city} · ${ota.provider}`,
+    subtitle: `${nights} night${nights === 1 ? "" : "s"} · dates pre-filled`,
+    price: seededPrice(seed + ota.offset, mid - spread / 2, spread),
+    meta: ["OTA search", ota.provider],
+    refundable: true,
+    product_url: ota.url,
+    badge: i === 0 ? "Recommended OTA" : undefined,
+  }))
+}
+
+function generateChainHotelListings(params: HotelSearchParams): TravelListing[] {
+  const nights = hotelNightCount(params)
+  const bounds = hotelStayBounds(params)
   const seed = hashSeed([
     params.placeId ?? params.cityCode,
     params.destination || params.city,
     params.checkIn,
     params.checkOut,
-    String(params.rooms),
   ])
   const guests = params.guests.adults + params.guests.children
+  const bookUrl = buildBookingHotelUrl(params)
 
-  let listings: TravelListing[] = HOTEL_TEMPLATES.map((tpl, i) => {
-    const perNight = seededPrice(seed + i * 23, 2200 + tpl.stars * 900, 12000)
-    const price = Math.round(perNight * nights * params.rooms * (guests > 2 ? 1.08 : 1))
-    const refundable = i % 4 !== 3
+  let listings: TravelListing[] = HOTEL_CHAINS.map((tpl, i) => {
+    const perNight = seededPrice(
+      seed + i * 23,
+      bounds.minPerNight + tpl.stars * 800,
+      bounds.maxPerNight - bounds.minPerNight
+    )
+    const price = Math.round(
+      perNight * nights * params.rooms * (guests > 2 ? 1.08 : 1)
+    )
     return {
-      id: `htl-${params.placeId ?? params.cityCode}-${i}`,
+      id: `htl-chain-${i}`,
       category: "hotels" as const,
       provider: tpl.chain,
       title: `${tpl.chain} · ${params.destination || params.city}`,
@@ -166,10 +326,9 @@ export function generateHotelListings(params: HotelSearchParams): TravelListing[
       meta: [
         `${params.rooms} room${params.rooms === 1 ? "" : "s"}`,
         `${guests} guest${guests === 1 ? "" : "s"}`,
-        refundable ? "Free cancellation" : "Non-refundable",
       ],
-      refundable,
-      badge: i === 0 ? "Best value" : tpl.stars >= 5 ? "Luxury" : undefined,
+      refundable: i % 3 !== 2,
+      product_url: bookUrl,
     }
   })
 
@@ -178,32 +337,280 @@ export function generateHotelListings(params: HotelSearchParams): TravelListing[
   }
   if (params.filters.minStars > 0) {
     listings = listings.filter((l) => {
-      const tpl = HOTEL_TEMPLATES.find((t) => l.provider.startsWith(t.chain))
+      const tpl = HOTEL_CHAINS.find((t) => l.provider.startsWith(t.chain))
       return (tpl?.stars ?? 0) >= params.filters.minStars
     })
-  }
-  if (params.filters.chains.length > 0) {
-    listings = listings.filter((l) =>
-      params.filters.chains.some(
-        (c) => l.provider.toLowerCase().includes(c.toLowerCase())
-      )
-    )
   }
   if (params.filters.maxPrice != null) {
     listings = listings.filter((l) => l.price <= params.filters.maxPrice!)
   }
 
-  listings.sort((a, b) => {
-    if (params.sort === "cheapest") return a.price - b.price
-    if (params.sort === "rating") {
-      const sa = HOTEL_TEMPLATES.find((t) => a.provider.startsWith(t.chain))?.stars ?? 0
-      const sb = HOTEL_TEMPLATES.find((t) => b.provider.startsWith(t.chain))?.stars ?? 0
-      return sb - sa
+  return listings.filter((l) => scoreHotelListing(l, params) >= 0)
+}
+
+function finalizeFlightListings(
+  listings: TravelListing[],
+  params: FlightSearchParams
+): TravelListing[] {
+  const scored = listings
+    .map((l) => ({ l, s: scoreFlightListing(l, params) }))
+    .filter((x) => x.s >= 0)
+
+  scored.sort((a, b) => {
+    if (params.sort === "cheapest") return a.l.price - b.l.price
+    if (params.sort === "fastest" || params.sort === "shortest") {
+      return b.s - a.s
     }
-    return a.price - b.price
+    if (b.s !== a.s) return b.s - a.s
+    return a.l.price - b.l.price
   })
 
-  return listings.slice(0, 8)
+  const output = scored.map((x) => x.l).slice(0, 8)
+  const best = pickDefaultFlightListing(output, params)
+  const cheapest = [...output].sort((a, b) => a.price - b.price)[0]
+
+  return output.map((row) => ({
+    ...row,
+    badge:
+      row.id === best?.id
+        ? "Best match"
+        : row.id === cheapest?.id && cheapest.id !== best?.id
+          ? "Lowest fare"
+          : row.badge,
+  }))
+}
+
+function finalizeHotelListings(
+  listings: TravelListing[],
+  params: HotelSearchParams
+): TravelListing[] {
+  const scored = listings
+    .map((l) => ({ l, s: scoreHotelListing(l, params) }))
+    .filter((x) => x.s >= 0)
+
+  scored.sort((a, b) => {
+    if (params.sort === "cheapest") return a.l.price - b.l.price
+    if (params.sort === "rating") return b.s - a.s
+    if (b.s !== a.s) return b.s - a.s
+    return a.l.price - b.l.price
+  })
+
+  const output = scored.map((x) => x.l).slice(0, 8)
+  const best = pickDefaultHotelListing(output, params)
+  const cheapest = [...output].sort((a, b) => a.price - b.price)[0]
+
+  return output.map((row) => ({
+    ...row,
+    badge:
+      row.id === best?.id
+        ? "Best match"
+        : row.id === cheapest?.id && cheapest.id !== best?.id
+          ? "Lowest stay"
+          : row.badge,
+  }))
+}
+
+export async function fetchFlightListings(
+  params: FlightSearchParams
+): Promise<TravelListing[]> {
+  const route = `${params.originCode}-${params.destinationCode}`
+  const listings: TravelListing[] = [
+    ...generateOtaFlightListings(params),
+    ...generateAirlineFlightListings(params),
+  ]
+
+  if (SERPER_API_KEYS.length > 0) {
+    const depart = params.departDate
+    const queries = [
+      `flights ${route} ${depart} India makemytrip`,
+      `flights ${route} ${depart} cleartrip price`,
+      `${params.originCode} to ${params.destinationCode} flight fare ${depart}`,
+    ]
+    const batches = await Promise.all(
+      queries.map((q) => fetchSerperShopping(q, 4))
+    )
+    let idx = 0
+    for (const batch of batches) {
+      for (const item of batch) {
+        const src = (item.source ?? "").toLowerCase()
+        const provider = /makemytrip|mmt/.test(src)
+          ? "MakeMyTrip"
+          : /cleartrip/.test(src)
+            ? "Cleartrip"
+            : /goibibo/.test(src)
+              ? "Goibibo"
+              : "Flight offer"
+        const bookUrl =
+          provider === "Cleartrip"
+            ? buildCleartripFlightUrl(params)
+            : provider === "Goibibo"
+              ? buildGoibiboFlightUrl(params)
+              : buildMakeMyTripFlightUrl(params)
+        const row = listingFromSerperFlight(item, params, idx, bookUrl, provider)
+        if (row) listings.push(row)
+        idx += 1
+      }
+    }
+  }
+
+  return finalizeFlightListings(listings, params)
+}
+
+export async function fetchHotelListings(
+  params: HotelSearchParams
+): Promise<TravelListing[]> {
+  const dest = params.destination || params.city
+  const listings: TravelListing[] = [
+    ...generateOtaHotelListings(params),
+    ...generateChainHotelListings(params),
+  ]
+
+  if (SERPER_API_KEYS.length > 0) {
+    const queries = [
+      `hotels ${dest} ${params.checkIn} booking.com`,
+      `hotels ${dest} makemytrip ${params.checkIn}`,
+      `${dest} hotel ${params.checkIn} to ${params.checkOut} agoda`,
+    ]
+    const batches = await Promise.all(
+      queries.map((q) => fetchSerperShopping(q, 4))
+    )
+    let idx = 0
+    for (const batch of batches) {
+      for (const item of batch) {
+        const src = (item.source ?? "").toLowerCase()
+        const provider = /booking/.test(src)
+          ? "Booking.com"
+          : /makemytrip|mmt/.test(src)
+            ? "MakeMyTrip"
+            : /agoda/.test(src)
+              ? "Agoda"
+              : /cleartrip/.test(src)
+                ? "Cleartrip"
+                : "Hotel offer"
+        const bookUrl =
+          provider === "MakeMyTrip"
+            ? buildMakeMyTripHotelUrl(params)
+            : provider === "Agoda"
+              ? buildAgodaHotelUrl(params)
+              : provider === "Cleartrip"
+                ? buildCleartripHotelUrl(params)
+                : buildBookingHotelUrl(params)
+        const row = listingFromSerperHotel(item, params, idx, bookUrl, provider)
+        if (row) listings.push(row)
+        idx += 1
+      }
+    }
+  }
+
+  return finalizeHotelListings(listings, params)
+}
+
+/** @deprecated Use fetchFlightListings */
+export function generateFlightListings(
+  params: FlightSearchParams
+): TravelListing[] {
+  return finalizeFlightListings(
+    [...generateOtaFlightListings(params), ...generateAirlineFlightListings(params)],
+    params
+  )
+}
+
+/** @deprecated Use fetchHotelListings */
+export function generateHotelListings(
+  params: HotelSearchParams
+): TravelListing[] {
+  return finalizeHotelListings(
+    [...generateOtaHotelListings(params), ...generateChainHotelListings(params)],
+    params
+  )
+}
+
+export function pickDefaultFlightListing(
+  listings: TravelListing[],
+  params: FlightSearchParams
+): TravelListing | null {
+  const scored = listings
+    .map((l) => ({ l, s: scoreFlightListing(l, params) }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => b.s - a.s)
+  return scored[0]?.l ?? listings[0] ?? null
+}
+
+export function pickDefaultHotelListing(
+  listings: TravelListing[],
+  params: HotelSearchParams
+): TravelListing | null {
+  const scored = listings
+    .map((l) => ({ l, s: scoreHotelListing(l, params) }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => b.s - a.s)
+  return scored[0]?.l ?? listings[0] ?? null
+}
+
+export function resolveFlightListing(
+  listings: TravelListing[],
+  estimatedFare: number | null,
+  selectedListingId: string | null | undefined,
+  params: FlightSearchParams
+): { listing: TravelListing | null; price: number | null } {
+  const bounds = flightTotalBounds(params)
+
+  if (selectedListingId) {
+    const picked = listings.find((l) => l.id === selectedListingId)
+    if (picked && scoreFlightListing(picked, params) >= 0) {
+      const price =
+        picked.price >= bounds.min ? picked.price : estimatedFare ?? null
+      return { listing: picked, price }
+    }
+  }
+
+  const best = pickDefaultFlightListing(listings, params)
+  if (best && best.price >= bounds.min) {
+    return { listing: best, price: best.price }
+  }
+
+  if (estimatedFare != null && estimatedFare >= bounds.min) {
+    return { listing: best ?? listings[0] ?? null, price: estimatedFare }
+  }
+
+  const priced = listings.find(
+    (l) => l.price >= bounds.min && scoreFlightListing(l, params) >= 0
+  )
+  return { listing: priced ?? best ?? null, price: priced?.price ?? null }
+}
+
+export function resolveHotelListing(
+  listings: TravelListing[],
+  estimatedTotal: number | null,
+  selectedListingId: string | null | undefined,
+  params: HotelSearchParams
+): { listing: TravelListing | null; price: number | null } {
+  const bounds = hotelStayBounds(params)
+
+  if (selectedListingId) {
+    const picked = listings.find((l) => l.id === selectedListingId)
+    if (picked && scoreHotelListing(picked, params) >= 0) {
+      const price =
+        picked.price >= bounds.minTotal
+          ? picked.price
+          : estimatedTotal ?? null
+      return { listing: picked, price }
+    }
+  }
+
+  const best = pickDefaultHotelListing(listings, params)
+  if (best && best.price >= bounds.minTotal) {
+    return { listing: best, price: best.price }
+  }
+
+  if (estimatedTotal != null && estimatedTotal >= bounds.minTotal) {
+    return { listing: best ?? listings[0] ?? null, price: estimatedTotal }
+  }
+
+  const priced = listings.find(
+    (l) => l.price >= bounds.minTotal && scoreHotelListing(l, params) >= 0
+  )
+  return { listing: priced ?? best ?? null, price: priced?.price ?? null }
 }
 
 export function resolveTravelPrice(
