@@ -1,12 +1,13 @@
 "use client"
 
-import type { DealSearchResult } from "@/lib/deal-search"
+import type { DealSearchResult, TravelListing } from "@/lib/deal-search"
 import { DealOfferDetail } from "@/components/deal-offer-detail"
 import { TravelListingsPanel } from "@/components/travel-listings-panel"
 import { TravelBookCta } from "@/components/travel-book-cta"
 import { MissingCardTeasers } from "@/components/missing-card-teasers"
 import type { FlightSearchParams } from "@/lib/flight-search"
 import type { HotelSearchParams } from "@/lib/hotel-search"
+import type { ProductSearchParams } from "@/lib/product-search"
 import { formatInr } from "@/lib/deal-offer-breakdown"
 import { cn } from "@/lib/utils"
 
@@ -14,38 +15,60 @@ type DealSearchResultsProps = {
   result: DealSearchResult
   flightSearch?: FlightSearchParams | null
   hotelSearch?: HotelSearchParams | null
+  productSearch?: ProductSearchParams | null
   onSelectListing?: (listingId: string, price: number) => void
   onNeedSignIn?: () => void
   onApplyBestCard?: () => void
+}
+
+function selectedListing(
+  result: DealSearchResult
+): TravelListing | null {
+  if (!result.selected_travel_listing_id) return null
+  return (
+    result.travel_listings.find(
+      (l) => l.id === result.selected_travel_listing_id
+    ) ?? null
+  )
 }
 
 export function DealSearchResults({
   result,
   flightSearch,
   hotelSearch,
+  productSearch,
   onSelectListing,
   onNeedSignIn,
   onApplyBestCard,
 }: DealSearchResultsProps) {
   const isTravel =
     result.category === "flight" || result.category === "hotels"
-  const travelCategory =
-    result.category === "flight" ? "flight" : "hotels"
+  const isProduct = result.category === "product"
+  const listingCategory = result.category as "flight" | "hotels" | "product"
+  const hasListings = result.travel_listings.length > 0
+  const picked = selectedListing(result)
+  const checkoutUrl =
+    picked?.product_url?.trim() || result.source_url || null
 
   return (
     <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-4 backdrop-blur-md">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            {isTravel ? "Your search" : "Purchase"}
+            {isProduct
+              ? "Product search"
+              : isTravel
+                ? "Your search"
+                : "Purchase"}
           </p>
-          <h3 className="mt-1 truncate text-base font-bold text-slate-50">
+          <h3 className="mt-1 line-clamp-2 text-base font-bold text-slate-50">
             {result.product_title}
           </h3>
           <p className="text-xs text-slate-500">
-            {result.platform} · {result.category}
-            {result.used_serper ? " · Serper live" : ""}
-            {result.used_ai ? " · AI ranked" : " · rule-based estimate"}
+            {result.platform}
+            {picked && isProduct ? ` · ${picked.provider} selected` : ""}
+            {result.used_serper ? " · live listings" : ""}
+            {result.used_ai ? " · AI ranked" : " · rule-based"}
           </p>
           {result.data_sources.length > 0 ? (
             <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-600">
@@ -56,7 +79,7 @@ export function DealSearchResults({
         {result.estimated_price !== null ? (
           <div className="shrink-0 text-right">
             <p className="text-[10px] uppercase text-slate-500">
-              {isTravel ? "Fare for cards" : "Est. price"}
+              {isProduct ? "Price for cards" : isTravel ? "Fare for cards" : "Est. price"}
             </p>
             <p className="font-mono text-sm font-bold text-slate-200">
               {formatInr(result.estimated_price)}
@@ -65,11 +88,11 @@ export function DealSearchResults({
         ) : null}
       </div>
 
-      {isTravel && result.travel_listings.length > 0 ? (
+      {hasListings ? (
         <TravelListingsPanel
           listings={result.travel_listings}
           selectedId={result.selected_travel_listing_id}
-          category={travelCategory}
+          category={listingCategory}
           onSelect={(listing) =>
             onSelectListing?.(listing.id, listing.price)
           }
@@ -80,6 +103,9 @@ export function DealSearchResults({
         <div className="mb-3 border-t border-slate-800/60 pt-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-400">
             Best card — exact ₹ breakdown
+            {isProduct && picked
+              ? ` on ${picked.provider}`
+              : ""}
           </p>
           <DealOfferDetail offer={result.best_offer} highlight />
         </div>
@@ -88,7 +114,7 @@ export function DealSearchResults({
       {isTravel && (flightSearch || hotelSearch) ? (
         <TravelBookCta
           className="mb-3"
-          category={travelCategory}
+          category={result.category === "flight" ? "flight" : "hotels"}
           flightSearch={flightSearch}
           hotelSearch={hotelSearch}
           platform={result.platform}
@@ -101,13 +127,14 @@ export function DealSearchResults({
         />
       ) : null}
 
-      {result.category === "product" && result.source_url ? (
+      {isProduct && checkoutUrl ? (
         <TravelBookCta
           className="mb-3"
           category="product"
-          sourceUrl={result.source_url}
-          platform={result.platform}
+          sourceUrl={checkoutUrl}
+          platform={picked?.provider ?? result.platform}
           productTitle={result.product_title}
+          productQuery={productSearch?.query ?? result.product_title}
           bestCardLabel={
             result.best_offer
               ? `${result.best_offer.bank_name} ${result.best_offer.card_name}`
@@ -135,25 +162,6 @@ export function DealSearchResults({
               )}
             >
               <DealOfferDetail offer={offer} compact />
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {result.market_offers.length > 0 && !isTravel ? (
-        <div className="mb-3 space-y-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-300">
-            Live offers found (Serper)
-          </p>
-          {result.market_offers.slice(0, 4).map((offer, index) => (
-            <div
-              key={`${offer.title}-${index}`}
-              className="border-t border-slate-800/60 pt-2 first:border-0 first:pt-0"
-            >
-              <p className="text-xs font-medium text-slate-200">{offer.title}</p>
-              <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500">
-                {offer.snippet}
-              </p>
             </div>
           ))}
         </div>

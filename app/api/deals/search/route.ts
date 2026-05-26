@@ -10,7 +10,7 @@ export const maxDuration = 30
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>
-    const parsed = parseSearchRequestBody(body)
+    const parsed = await parseSearchRequestBody(body)
 
     if ("error" in parsed) {
       return NextResponse.json({ error: parsed.error }, { status: 400 })

@@ -446,6 +446,12 @@ function buildFlipkartSearchUrl(query: string): string {
   return wrapFlipkartProductUrl(url.toString())
 }
 
+export function buildProductHandoffSummary(query: string, provider?: string): string {
+  const q = query.trim() || "your product"
+  if (provider) return `${q} · comparing stores · selected ${provider}`
+  return `${q} · comparing Amazon, Flipkart, Myntra & more`
+}
+
 /** Product deep links from pasted URL — affiliate params added when markers are set */
 export function buildProductAffiliateLinks(
   sourceUrl: string,

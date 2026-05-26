@@ -45,7 +45,7 @@ export type DealOffer = {
 
 export type TravelListing = {
   id: string
-  category: "flight" | "hotels"
+  category: "flight" | "hotels" | "product"
   provider: string
   title: string
   subtitle: string
@@ -53,6 +53,8 @@ export type TravelListing = {
   meta: string[]
   refundable: boolean
   badge?: string
+  /** Product listing — checkout deep link */
+  product_url?: string
 }
 
 export type DealSearchResult = {

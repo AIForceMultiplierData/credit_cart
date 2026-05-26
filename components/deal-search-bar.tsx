@@ -11,7 +11,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -32,9 +31,15 @@ import {
   validateHotelSearch,
   type HotelSearchParams,
 } from "@/lib/hotel-search"
+import {
+  defaultProductSearchParams,
+  validateProductSearch,
+  type ProductSearchParams,
+} from "@/lib/product-search"
 import { DealSearchResults } from "@/components/deal-search-results"
 import { FlightSearchForm } from "@/components/flight-search-form"
 import { HotelSearchForm } from "@/components/hotel-search-form"
+import { ProductSearchForm } from "@/components/product-search-form"
 import { useCardLead } from "@/components/card-lead-provider"
 import {
   Tooltip,
@@ -44,11 +49,10 @@ import {
 import { cn } from "@/lib/utils"
 
 const DEAL_FINDER_HELP_ITEMS = [
-  "Paste URL → best card + exact ₹ off & pay amount",
+  "Product → search name, compare stores, rank cards",
+  "Flights / hotels → rank cards, book on OTA (pre-filled link)",
   "Wallet + circle cards ranked with T&C",
   "Pool with circle → 50/50 cashback split",
-  "Flights / hotels → rank cards, then book on OTA (pre-filled link)",
-  "See cards to apply for bigger savings",
 ] as const
 
 type DealSearchBarProps = {
@@ -60,29 +64,17 @@ const CATEGORY_OPTIONS: Array<{
   value: DealSearchCategory
   label: string
   icon: typeof Plane
-  placeholder: string
 }> = [
-  {
-    value: "flight",
-    label: "Flight",
-    icon: Plane,
-    placeholder: "",
-  },
-  {
-    value: "hotels",
-    label: "Hotels",
-    icon: Hotel,
-    placeholder: "",
-  },
-  {
-    value: "product",
-    label: "Product",
-    icon: Package,
-    placeholder: "Paste Amazon / Flipkart product URL…",
-  },
+  { value: "flight", label: "Flight", icon: Plane },
+  { value: "hotels", label: "Hotels", icon: Hotel },
+  { value: "product", label: "Product", icon: Package },
 ]
 
-const TRAVEL_CATEGORIES = new Set<DealSearchCategory>(["flight", "hotels"])
+const LISTING_CATEGORIES = new Set<DealSearchCategory>([
+  "flight",
+  "hotels",
+  "product",
+])
 
 export function DealSearchBar({
   onNeedWallet,
@@ -92,13 +84,15 @@ export function DealSearchBar({
   const { openLeadForm } = useCardLead()
   const { searchCards, walletCount, circleCount, loading: cardsLoading } =
     useDealSearchCards(user?.id)
-  const [category, setCategory] = useState<DealSearchCategory>("product")
-  const [url, setUrl] = useState("")
+  const [category, setCategory] = useState<DealSearchCategory>("flight")
   const [flightSearch, setFlightSearch] = useState<FlightSearchParams>(
     defaultFlightSearchParams
   )
   const [hotelSearch, setHotelSearch] = useState<HotelSearchParams>(
     defaultHotelSearchParams
+  )
+  const [productSearch, setProductSearch] = useState<ProductSearchParams>(
+    defaultProductSearchParams
   )
   const [searching, setSearching] = useState(false)
   const [result, setResult] = useState<DealSearchResult | null>(null)
@@ -113,10 +107,6 @@ export function DealSearchBar({
     const timer = window.setTimeout(() => setHelpOpen(false), 3000)
     return () => window.clearTimeout(timer)
   }, [helpOpen])
-
-  const selectedCategory =
-    CATEGORY_OPTIONS.find((option) => option.value === category) ??
-    CATEGORY_OPTIONS[2]
 
   async function runSearch(body: Record<string, unknown>) {
     const response = await fetch("/api/deals/search", {
@@ -156,8 +146,6 @@ export function DealSearchBar({
       return
     }
 
-    const trimmedUrl = url.trim()
-
     if (category === "flight") {
       const valid = validateFlightSearch(flightSearch)
       if (!valid.ok) {
@@ -170,11 +158,14 @@ export function DealSearchBar({
         toast.error("Complete hotel details", { description: valid.message })
         return
       }
-    } else if (!trimmedUrl) {
-      toast.error("URL required", {
-        description: "Paste the product link you want to optimize.",
+    } else {
+      const valid = validateProductSearch(productSearch, {
+        requirePrice: false,
       })
-      return
+      if (!valid.ok) {
+        toast.error("Complete product search", { description: valid.message })
+        return
+      }
     }
 
     setSearching(true)
@@ -183,10 +174,11 @@ export function DealSearchBar({
     try {
       await runSearch({
         category,
-        url: TRAVEL_CATEGORIES.has(category) ? "" : trimmedUrl,
+        url: "",
         searchCards,
         ...(category === "flight" ? { flightSearch } : {}),
         ...(category === "hotels" ? { hotelSearch } : {}),
+        ...(category === "product" ? { productSearch } : {}),
       })
     } catch (err) {
       const message =
@@ -218,9 +210,17 @@ export function DealSearchBar({
         }
         setHotelSearch(next)
         await runSearch({ category, url: "", searchCards, hotelSearch: next })
+      } else {
+        const next: ProductSearchParams = {
+          ...productSearch,
+          selectedListingId: listingId,
+          estimatedPrice: price > 0 ? price : productSearch.estimatedPrice,
+        }
+        setProductSearch(next)
+        await runSearch({ category, url: "", searchCards, productSearch: next })
       }
     } catch (err) {
-      toast.error("Could not update fare", {
+      toast.error("Could not update selection", {
         description: err instanceof Error ? err.message : undefined,
       })
     } finally {
@@ -291,19 +291,6 @@ export function DealSearchBar({
               })}
             </SelectContent>
           </Select>
-
-          {category === "product" ? (
-            <Input
-              type="url"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              placeholder={selectedCategory.placeholder}
-              className="h-11 flex-1 border-slate-700 bg-slate-950 text-slate-50"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void handleSearch()
-              }}
-            />
-          ) : null}
         </div>
 
         {category === "flight" ? (
@@ -321,6 +308,15 @@ export function DealSearchBar({
           </div>
         ) : null}
 
+        {category === "product" ? (
+          <div className="mt-3 min-w-0 overflow-hidden">
+            <ProductSearchForm
+              value={productSearch}
+              onChange={setProductSearch}
+            />
+          </div>
+        ) : null}
+
         <Button
           type="button"
           disabled={searching || authLoading || cardsLoading}
@@ -335,9 +331,7 @@ export function DealSearchBar({
           ) : (
             <>
               <Search className="mr-2 h-4 w-4" />
-              {TRAVEL_CATEGORIES.has(category)
-                ? "Search & rank my cards"
-                : "Find best deal with my cards"}
+              Search & rank my cards
             </>
           )}
         </Button>
@@ -355,8 +349,9 @@ export function DealSearchBar({
           result={result}
           flightSearch={category === "flight" ? flightSearch : null}
           hotelSearch={category === "hotels" ? hotelSearch : null}
+          productSearch={category === "product" ? productSearch : null}
           onSelectListing={
-            TRAVEL_CATEGORIES.has(category)
+            LISTING_CATEGORIES.has(category)
               ? (id, price) => void handleListingSelect(id, price)
               : undefined
           }
@@ -368,7 +363,7 @@ export function DealSearchBar({
                     card_id: result.best_offer!.card_id,
                     bank_name: result.best_offer!.bank_name,
                     card_name: result.best_offer!.card_name,
-                    source: "travel_deal_search",
+                    source: "deal_search",
                   })
               : undefined
           }

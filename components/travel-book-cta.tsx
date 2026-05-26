@@ -9,6 +9,7 @@ import {
   buildHotelAffiliateLinks,
   buildHotelHandoffSummary,
   buildProductAffiliateLinks,
+  buildProductHandoffSummary,
   primaryAffiliateBookLabel,
   type AffiliateLink,
 } from "@/lib/affiliate-links"
@@ -22,6 +23,7 @@ type AffiliateBookCtaProps = {
   sourceUrl?: string | null
   platform?: string | null
   productTitle?: string | null
+  productQuery?: string | null
   bestCardLabel?: string | null
   onApplyCard?: () => void
   className?: string
@@ -68,6 +70,7 @@ function resolveLinks(
     sourceUrl,
     platform,
     productTitle,
+    productQuery,
     bestCardLabel,
   } = props
 
@@ -88,9 +91,12 @@ function resolveLinks(
       links: buildProductAffiliateLinks(
         sourceUrl.trim(),
         platform ?? "Store",
-        productTitle ?? undefined
+        productTitle ?? productQuery ?? undefined
       ),
-      handoffSummary: null,
+      handoffSummary: buildProductHandoffSummary(
+        productQuery ?? productTitle ?? "",
+        platform ?? undefined
+      ),
     }
   }
   return { links: [], handoffSummary: null }

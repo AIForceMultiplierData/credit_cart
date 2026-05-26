@@ -36,6 +36,18 @@ import {
   type HotelSearchParams,
 } from "@/lib/hotel-search"
 import {
+  fetchProductListings,
+  resolveProductListing,
+} from "@/lib/product-listings"
+import {
+  buildProductProductTitle,
+  buildProductReferenceUrl,
+  buildProductSerperQuery,
+  parseProductSearchBody,
+  validateProductSearch,
+  type ProductSearchParams,
+} from "@/lib/product-search"
+import {
   generateFlightListings,
   generateHotelListings,
   resolveTravelPrice,
@@ -52,6 +64,7 @@ type SearchRequestBody = {
   walletCards?: WalletCardInput[]
   flightSearch?: unknown
   hotelSearch?: unknown
+  productSearch?: unknown
 }
 
 export type DealSearchOverrides = {
@@ -60,6 +73,7 @@ export type DealSearchOverrides = {
   serperQuery?: string
   travelListings?: TravelListing[]
   selectedTravelListingId?: string | null
+  platform?: string
 }
 
 function buildTravelOverrides(
@@ -112,6 +126,61 @@ function buildTravelOverrides(
   return { error: "Invalid travel search." }
 }
 
+export async function buildProductOverrides(
+  product: ProductSearchParams
+): Promise<DealSearchOverrides & { url: string } | { error: string }> {
+  const listings = await fetchProductListings(product)
+  if (listings.length === 0) {
+    return {
+      error:
+        "No store listings found. Try a shorter product name or paste a link.",
+    }
+  }
+
+  const { listing, price: resolvedPrice } = resolveProductListing(
+    listings,
+    product.estimatedPrice,
+    product.selectedListingId
+  )
+
+  let price = resolvedPrice
+  if (price === null || price <= 0) {
+    if (product.estimatedPrice && product.estimatedPrice > 0) {
+      price = product.estimatedPrice
+    } else {
+      const priced = listings.find((l) => l.price > 0)
+      price = priced?.price ?? null
+    }
+  }
+
+  if (price === null || price <= 0) {
+    return {
+      error:
+        "Pick a store listing below or enter total price (₹) for card ranking.",
+    }
+  }
+
+  const selected =
+    listing ??
+    listings.find((l) => l.id === product.selectedListingId) ??
+    listings[0]
+
+  const url =
+    selected?.product_url?.trim() ||
+    product.pastedUrl?.trim() ||
+    buildProductReferenceUrl(product)
+
+  return {
+    productTitle: buildProductProductTitle(product),
+    estimatedPrice: price,
+    serperQuery: buildProductSerperQuery(product),
+    travelListings: listings,
+    selectedTravelListingId: selected?.id ?? listings[0]?.id ?? null,
+    platform: selected?.provider ?? detectPlatform(url),
+    url,
+  }
+}
+
 function applyTravelToResult(
   result: DealSearchResult,
   overrides?: DealSearchOverrides
@@ -124,9 +193,13 @@ function applyTravelToResult(
     }
   }
 
-  const sources = result.data_sources.includes("travel_estimates")
+  const tag =
+    overrides?.travelListings?.[0]?.category === "product"
+      ? "store_compare"
+      : "travel_estimates"
+  const sources = result.data_sources.includes(tag)
     ? result.data_sources
-    : [...result.data_sources, "travel_estimates"]
+    : [...result.data_sources, tag]
 
   return {
     ...result,
@@ -463,7 +536,7 @@ export async function searchDealsForWallet(
   searchCards: SearchCardInput[],
   overrides?: DealSearchOverrides
 ): Promise<DealSearchResult> {
-  const platform = detectPlatform(url)
+  const platform = overrides?.platform ?? detectPlatform(url)
   const hints = await fetchUrlHints(url)
 
   const serper = await fetchSerperDealContext({
@@ -548,12 +621,15 @@ export async function searchDealsForWallet(
   }
 }
 
-export function parseSearchRequestBody(body: SearchRequestBody): {
-  category: DealSearchCategory
-  url: string
-  searchCards: SearchCardInput[]
-  overrides?: DealSearchOverrides
-} | { error: string } {
+export async function parseSearchRequestBody(body: SearchRequestBody): Promise<
+  | {
+      category: DealSearchCategory
+      url: string
+      searchCards: SearchCardInput[]
+      overrides?: DealSearchOverrides
+    }
+  | { error: string }
+> {
   const category = normalizeCategory(String(body.category ?? ""))
 
   if (!category) {
@@ -605,10 +681,32 @@ export function parseSearchRequestBody(body: SearchRequestBody): {
     overrides = travel
   }
 
+  if (category === "product") {
+    if (!body.productSearch) {
+      return {
+        error: "Describe what you want to buy to compare stores and cards.",
+      }
+    }
+    const product = parseProductSearchBody(body.productSearch)
+    if (!product) {
+      return { error: "Invalid product search details." }
+    }
+    const valid = validateProductSearch(product, { requirePrice: false })
+    if (!valid.ok) {
+      return { error: valid.message }
+    }
+    const built = await buildProductOverrides(product)
+    if ("error" in built) {
+      return { error: built.error }
+    }
+    url = built.url
+    overrides = built
+  }
+
   if (!url) {
     return {
       error:
-        "Paste a product URL, or complete flight / hotel search details.",
+        "Describe a product, or complete flight / hotel search details.",
     }
   }
 
