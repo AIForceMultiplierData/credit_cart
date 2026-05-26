@@ -140,7 +140,8 @@ export async function buildProductOverrides(
   const { listing, price: resolvedPrice } = resolveProductListing(
     listings,
     product.estimatedPrice,
-    product.selectedListingId
+    product.selectedListingId,
+    product.query
   )
 
   let price = resolvedPrice
@@ -358,7 +359,8 @@ function normalizeOffers(
   estimatedPrice: number | null,
   category: DealSearchCategory,
   url: string,
-  serper: SerperDealContext
+  serper: SerperDealContext,
+  platform: string
 ): DealOffer[] {
   const aiByKey = new Map<string, Partial<DealOffer> & { card_id: string }>()
 
@@ -418,7 +420,7 @@ function normalizeOffers(
         : undefined,
     }
 
-    return applySerperOverrides(base, card, serper, estimatedPrice)
+    return applySerperOverrides(base, card, serper, estimatedPrice, platform)
   })
 
   if (merged.length === 0) {
@@ -479,7 +481,8 @@ function buildAiResult(
     estimatedPrice,
     category,
     url,
-    serper
+    serper,
+    overrides?.platform ?? detectPlatform(url)
   )
   const bestOffer = offers.find((offer) => offer.recommended) ?? offers[0] ?? null
   const counts = countSearchCards(searchCards)
@@ -495,7 +498,8 @@ function buildAiResult(
       serper.product_title ||
       hints.title ||
       "Linked purchase",
-    platform: aiPayload.platform || detectPlatform(url),
+    platform:
+      overrides?.platform || aiPayload.platform || detectPlatform(url),
     category,
     source_url: url,
     estimated_price: estimatedPrice,
@@ -601,10 +605,12 @@ export async function searchDealsForWallet(
       fallback.estimated_price,
       category,
       url,
-      serper
+      serper,
+      platform
     )
     fallback.offers = offers
     fallback.best_offer = offers.find((o) => o.recommended) ?? offers[0] ?? null
+    fallback.platform = platform
 
     return finalizeSearchResult(
       attachSerperMetadata(

@@ -81,22 +81,49 @@ export function rankScoreForOffer(
   return score
 }
 
+/** Realistic caps — Serper snippets often cite promo headlines, not basket discount */
+export function capDiscountPercentForStore(
+  platform: string,
+  card: SearchCardInput,
+  serperPercent: number | null
+): number {
+  const p = platform.toLowerCase()
+  const label = `${card.bank_name} ${card.card_name}`.toLowerCase()
+  let cap = 15
+
+  if (/flipkart/.test(p) && /flipkart|axis/.test(label)) cap = 5
+  else if (/amazon/.test(p) && /amazon|icici/.test(label)) cap = 5
+  else if (/croma/.test(p) && /croma|tata/.test(label)) cap = 10
+  else if (/myntra/.test(p) && /myntra|sbi/.test(label)) cap = 10
+
+  if (serperPercent === null) return cap
+  return Math.min(serperPercent, cap)
+}
+
 export function applySerperOverrides(
   offer: DealOffer,
   card: SearchCardInput,
   serper: SerperDealContext,
-  estimatedPrice: number | null
+  estimatedPrice: number | null,
+  platform = ""
 ): DealOffer {
-  const serperPercent = extractSerperPercentForCard(serper, card)
+  const serperPercentRaw = extractSerperPercentForCard(serper, card)
+  const serperPercent =
+    serperPercentRaw !== null
+      ? capDiscountPercentForStore(platform, card, serperPercentRaw)
+      : null
   const serperBacked = isSerperBackedForCard(serper, card)
 
   let discountPercent = offer.discount_percent
   let reason = offer.reason
 
   if (serperPercent !== null) {
-    discountPercent = Math.max(discountPercent, serperPercent)
+    discountPercent = Math.min(
+      Math.max(discountPercent, serperPercent),
+      capDiscountPercentForStore(platform, card, serperPercentRaw)
+    )
     if (serperBacked) {
-      reason = `${reason} (Serper live: ~${serperPercent}% cited for ${card.bank_name} ${card.card_name})`
+      reason = `${reason} (Live offer: up to ${discountPercent}% on ${platform || "this store"})`
     }
   } else if (serperBacked) {
     reason = `${reason} (Backed by live web offer snippets)`

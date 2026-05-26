@@ -36,7 +36,7 @@ export function TravelListingsPanel({
       ? "Live flight picks"
       : category === "hotels"
         ? "Live hotel picks"
-        : "Same product · different stores"
+        : "Phones & gadgets · major stores only"
 
   return (
     <div className="mb-4 space-y-2 rounded-xl border border-sky-500/25 bg-sky-500/5 p-3">
@@ -51,7 +51,7 @@ export function TravelListingsPanel({
       </div>
       <p className="text-[11px] leading-relaxed text-slate-500">
         {category === "product"
-          ? "Tap a store to rank cards for that price. Checkout opens with affiliate link — no need to search again."
+          ? "We hide cases, rentals & junk prices. Tap a real phone listing (Amazon, Flipkart, Croma…) to rank cards."
           : "Tap a result to lock fare for card ranking. Book on OTAs via buttons below — route and dates pre-filled."}
       </p>
 
