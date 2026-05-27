@@ -130,13 +130,6 @@ export function DealSearchResults({
           </p>
           <DealOfferDetail offer={result.best_offer} highlight />
         </div>
-      ) : views.show_ping_split ? (
-        <NoQualifyingCardPanel
-          platform={picked?.provider ?? result.platform}
-          estimatedPrice={views.price_for_cards ?? result.estimated_price}
-          onPingSplit={onPingSplit}
-          onBrowseLenders={onBrowseLenders}
-        />
       ) : null}
 
       {isTravel && (flightSearch || hotelSearch) ? (
@@ -158,10 +151,25 @@ export function DealSearchResults({
           sourceUrl={checkoutUrl}
           platform={picked?.provider ?? result.platform}
           productTitle={picked?.title ?? result.product_title}
-          productQuery={productSearch?.query ?? result.product_title}
+          productQuery={
+            productSearch
+              ? `${productSearch.category} ${productSearch.subcategory} ${productSearch.brandModel}`
+              : result.product_title
+          }
           bestCardLabel={bestCardLabel}
           onApplyCard={hasQualifyingOffer ? onApplyBestCard : undefined}
         />
+      ) : null}
+
+      {!hasQualifyingOffer && views.show_ping_split ? (
+        <div className="mt-3 text-center">
+          <button
+            onClick={onPingSplit}
+            className="text-xs text-slate-400 hover:text-slate-300"
+          >
+            No qualifying cards? Try borrowing from a friend.
+          </button>
+        </div>
       ) : null}
 
       <p className="mb-3 text-sm text-slate-400">{result.summary}</p>

@@ -4,7 +4,9 @@ export type ProductSort = "best_card" | "cheapest"
 
 export type ProductSearchParams = {
   /** What the user is shopping for */
-  query: string
+  category: string | null
+  subcategory: string | null
+  brandModel: string | null
   /** Optional direct product URL (still cross-lists other stores) */
   pastedUrl: string | null
   estimatedPrice: number | null
@@ -19,7 +21,9 @@ export const PRODUCT_SORT_OPTIONS: Array<{ id: ProductSort; label: string }> = [
 
 export function defaultProductSearchParams(): ProductSearchParams {
   return {
-    query: "",
+    category: null,
+    subcategory: null,
+    brandModel: null,
     pastedUrl: null,
     estimatedPrice: null,
     selectedListingId: null,
@@ -28,17 +32,20 @@ export function defaultProductSearchParams(): ProductSearchParams {
 }
 
 export function buildProductSerperQuery(params: ProductSearchParams): string {
-  return buildProductSerperQueryFromRules(params)
+  const query = `${params.category} ${params.subcategory} ${params.brandModel}`
+  return buildProductSerperQueryFromRules({ ...params, query })
 }
 
 export function buildProductReferenceUrl(params: ProductSearchParams): string {
   if (params.pastedUrl?.trim()) return params.pastedUrl.trim()
-  const q = encodeURIComponent(params.query.trim())
+  const q = encodeURIComponent(
+    `${params.category} ${params.subcategory} ${params.brandModel}`
+  )
   return `https://www.google.com/search?tbm=shop&q=${q}`
 }
 
 export function buildProductProductTitle(params: ProductSearchParams): string {
-  const q = params.query.trim()
+  const q = `${params.category} ${params.subcategory} ${params.brandModel}`.trim()
   if (q.length > 0) return q
   if (params.pastedUrl) {
     try {
@@ -55,13 +62,13 @@ export function validateProductSearch(
   params: ProductSearchParams,
   options?: { requirePrice?: boolean }
 ): { ok: true } | { ok: false; message: string } {
-  const q = params.query.trim()
+  const { category, subcategory, brandModel } = params
   const url = params.pastedUrl?.trim() ?? ""
 
-  if (q.length < 2 && !url) {
+  if (!category || !subcategory || !brandModel) {
     return {
       ok: false,
-      message: "Describe what you want to buy, or paste a product link.",
+      message: "Please select a category, subcategory, and brand/model to search.",
     }
   }
 
@@ -90,7 +97,9 @@ export function parseProductSearchBody(raw: unknown): ProductSearchParams | null
   const fare = Number(b.estimatedPrice)
 
   return {
-    query: String(b.query ?? "").trim(),
+    category: typeof b.category === "string" ? b.category : null,
+    subcategory: typeof b.subcategory === "string" ? b.subcategory : null,
+    brandModel: typeof b.brandModel === "string" ? b.brandModel : null,
     pastedUrl:
       typeof b.pastedUrl === "string" && b.pastedUrl.trim()
         ? b.pastedUrl.trim()

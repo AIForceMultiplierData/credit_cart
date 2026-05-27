@@ -33,17 +33,24 @@ export const CATEGORY_RULES: Record<DealSearchCategory, CategoryRuleSet> = {
     pipeline: [
       "Parse query intent (phone / laptop / generic)",
       "Serper shopping per major store with accessory exclusions",
-      "Filter junk (cases, rentals, below min ₹)",
+      "Filter junk (cases, rentals, refurbished, below min ₹)",
       "Rank wallet + circle cards against selected store URL",
       "If no qualifying card → Ping 50/50 + lender deals",
     ],
     serperExcludes: [
       "-case",
       "-cover",
+      "-protector",
+      "-guard",
+      "-cable",
+      "-refurbished",
       "-rental",
       "-compatible",
       "-tempered",
       "-strap",
+      "-skin",
+      "-film",
+      "-repair",
     ],
     priceField: "listing",
   },
@@ -94,19 +101,29 @@ export function buildProductShoppingQueries(
   const q = params.query.trim()
   if (!q) return []
   const intent = inferProductIntent(q)
-  const excludes = CATEGORY_RULES.product.serperExcludes.join(" ")
+
+  const isHighTicket = /iphone|samsung|pixel|macbook|laptop|watch|ipad|tablet|camera/i.test(q);
+  let excludes = CATEGORY_RULES.product.serperExcludes.join(" ")
+
+  if (isHighTicket) {
+    // Force exclusion of accessories and prioritize official retail pricing
+    excludes += " -site:amazon.in/dp/*";
+  }
+
   const deviceHint =
     intent.kind === "phone"
       ? "smartphone mobile phone"
       : intent.kind === "laptop"
         ? "laptop notebook"
-        : "buy online"
+        : ""
+
+  const primaryQuery = `${q} ${deviceHint} buy online official price in india ${excludes}`.trim()
 
   return [
-    `${q} ${deviceHint} price INR amazon.in ${excludes}`,
-    `${q} buy flipkart.com ${deviceHint} ${excludes}`,
+    primaryQuery,
+    `${q} official store price flipkart.com ${excludes}`,
+    `${q} official store price amazon.in ${excludes}`,
     `${q} croma reliancedigital vijaysales price India ${excludes}`,
-    `${q} ${deviceHint} India MRP ${excludes}`,
   ]
 }
 

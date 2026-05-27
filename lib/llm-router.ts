@@ -27,14 +27,14 @@ type GeminiGenerateResponse = {
 }
 
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "qwen-qwq-32b",
+  "llama-3.1-70b-versatile",
+  "gemma2-9b-it",
   "llama-3.1-8b-instant",
 ] as const
 
 const CEREBRAS_MODELS = ["llama3.1-8b", "llama3.1-70b"] as const
 
-const GEMINI_MODEL = "gemini-2.5-flash"
+const GEMINI_MODEL = "gemini-1.5-flash"
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 const CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1/chat/completions"
@@ -67,30 +67,37 @@ export function safeJsonExtract(text: string): unknown {
 
   try {
     return JSON.parse(cleaned)
-  } catch {
-  }
+  } catch {}
 
   const arrayMatch = cleaned.match(/\[[\s\S]*\]/)
   if (arrayMatch) {
     try {
       return JSON.parse(arrayMatch[0])
-    } catch {
-    }
+    } catch {}
   }
 
   const objectMatch = cleaned.match(/\{[\s\S]*\}/)
   if (objectMatch) {
     try {
       return JSON.parse(objectMatch[0])
-    } catch {
-    }
+    } catch {}
   }
 
   throw new Error("Failed to parse JSON from LLM response")
 }
 
-function buildPrompt(systemPrompt: string, payload?: Record<string, unknown>): string {
-  return `SYSTEM:\n${systemPrompt}\n\nINPUT:\n${JSON.stringify(payload ?? {})}`
+function buildPrompt(
+  systemPrompt: string,
+  payload?: Record<string, unknown>
+): string {
+  // Inject price floor enforcement into the system prompt
+  const enhancedPrompt = `${systemPrompt}
+
+IMPORTANT: For high-value items like smartphones, laptops, or electronics, completely ignore any search results with unrealistically low prices (e.g., less than ₹5000 for a flagship phone). Prioritize results that reflect official retail pricing.`
+
+  return `SYSTEM:\n${enhancedPrompt}\n\nINPUT:\n${JSON.stringify(
+    payload ?? {}
+  )}`
 }
 
 async function postJson<T>(
@@ -199,7 +206,9 @@ async function callGeminiModel(
   apiKey: string,
   fullPrompt: string
 ): Promise<unknown | null> {
-  const url = `${GEMINI_ENDPOINT}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const url = `${GEMINI_ENDPOINT}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(
+    apiKey
+  )}`
 
   const result = await postJson<GeminiGenerateResponse>(url, {
     method: "POST",
