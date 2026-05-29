@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import { BankLogo } from "@/components/bank-logo"
 import { CardCatalogThumbnail } from "@/components/card-catalog-thumbnail"
-import { useCardCatalog } from "@/hooks/useCardCatalog"
+import { useCardCatalog } from "@/hooks/use-card-catalog"
 import type { CatalogCard } from "@/lib/card-catalog.generated"
 import { Button } from "@/components/ui/button"
 import {
