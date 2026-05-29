@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, ChevronsUpDown, Search } from "lucide-react"
+import { Check } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -13,18 +13,10 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Label } from "@/components/ui/label"
-import {
-  defaultProductSearchParams,
-  type ProductSearchParams,
-} from "@/lib/product-search"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/hooks/use-toast"
 
-const products = [
+const DEMO_PRODUCTS = [
   { value: "apple iphone 15 pro", label: "Apple iPhone 15 Pro" },
   { value: "samsung galaxy s24 ultra", label: "Samsung Galaxy S24 Ultra" },
   { value: "google pixel 8 pro", label: "Google Pixel 8 Pro" },
@@ -33,87 +25,100 @@ const products = [
 ]
 
 type ProductSearchFormProps = {
-  value?: ProductSearchParams
-  onChange?: (params: ProductSearchParams) => void
-  onSearch: (query: string) => void // New prop for triggering search
+  onSearch: (query: string) => void
 }
 
-export function ProductSearchForm({
-  value = defaultProductSearchParams(),
-  onChange,
-  onSearch,
-}: ProductSearchFormProps) {
-  const [open, setOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
-  const [manualInput, setManualInput] = useState("")
+export function ProductSearchForm({ onSearch }: ProductSearchFormProps) {
+  const [inputValue, setInputValue] = useState("")
+  const [selectedValue, setSelectedValue] = useState<string | null>(null)
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [manualUrl, setManualUrl] = useState("")
+  const { toast } = useToast()
+
+  const handleSelect = (currentValue: string, label: string) => {
+    const value = currentValue === selectedValue ? null : currentValue
+    setSelectedValue(value)
+    setInputValue(value ? label : "")
+    if (value) {
+      setShowManualInput(false)
+      setManualUrl("")
+    }
+  }
 
   const handleSearch = () => {
-    const query = selectedProduct || `${manualInput} official price`
-    onSearch(query)
+    if (selectedValue) {
+      onSearch(selectedValue)
+    } else if (showManualInput && manualUrl) {
+      onSearch(manualUrl)
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Invalid Product",
+        description: "Please select a valid product from the list.",
+      })
+    }
   }
 
   return (
-    <div className="space-y-3">
-      <div>
-        <Label className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
-          What are you looking for?
-        </Label>
-        <div className="flex gap-2">
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
+    <div className="space-y-3 w-full">
+      <Command className="w-full">
+        <CommandInput
+          placeholder="What are you looking for?"
+          value={inputValue}
+          onValueChange={setInputValue}
+        />
+        <CommandList>
+          <CommandEmpty>
+            <div className="text-center p-4">
+              <p>No product found.</p>
               <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className="w-[200px] justify-between"
+                variant="link"
+                className="text-xs"
+                onClick={() => setShowManualInput(true)}
               >
-                {selectedProduct
-                  ? products.find((p) => p.value === selectedProduct)?.label
-                  : "Select product..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                Enter URL or Search Manually
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0">
-              <Command>
-                <CommandInput
-                  placeholder="Search product..."
-                  onValueChange={setManualInput}
+            </div>
+          </CommandEmpty>
+          <CommandGroup>
+            {DEMO_PRODUCTS.filter(
+              (product) =>
+                !inputValue ||
+                product.label.toLowerCase().includes(inputValue.toLowerCase())
+            ).map((product) => (
+              <CommandItem
+                key={product.value}
+                value={product.value}
+                onSelect={(currentValue) => {
+                  handleSelect(currentValue, product.label)
+                }}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    selectedValue === product.value ? "opacity-100" : "opacity-0"
+                  )}
                 />
-                <CommandList>
-                  <CommandEmpty>No product found.</CommandEmpty>
-                  <CommandGroup>
-                    {products.map((product) => (
-                      <CommandItem
-                        key={product.value}
-                        value={product.value}
-                        onSelect={(currentValue) => {
-                          setSelectedProduct(
-                            currentValue === selectedProduct ? null : currentValue
-                          )
-                          setOpen(false)
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            selectedProduct === product.value
-                              ? "opacity-100"
-                              : "opacity-0"
-                          )}
-                        />
-                        {product.label}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          <Button onClick={handleSearch} disabled={!selectedProduct && !manualInput}>
-            <Search className="h-4 w-4" />
-          </Button>
+                {product.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+
+      {showManualInput && (
+        <div className="space-y-2">
+          <Input
+            placeholder="Enter product URL"
+            value={manualUrl}
+            onChange={(e) => setManualUrl(e.target.value)}
+          />
         </div>
-      </div>
+      )}
+
+      <Button onClick={handleSearch} className="w-full">
+        Search & rank my cards
+      </Button>
     </div>
   )
 }
