@@ -13,7 +13,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/hooks/use-toast"
+import type { ProductSearchParams } from "@/lib/product-search"
 
 const DEMO_PRODUCTS = [
   { value: "apple iphone 17 pro", label: "Apple iPhone 17 Pro" },
@@ -25,19 +25,18 @@ const DEMO_PRODUCTS = [
 ]
 
 type ProductSearchFormProps = {
-  onSearch: (query: string) => void
+  value: ProductSearchParams
+  onChange: (value: ProductSearchParams) => void
 }
 
-export function ProductSearchForm({ onSearch }: ProductSearchFormProps) {
-  const [inputValue, setInputValue] = useState("")
-  const [selectedValue, setSelectedValue] = useState<string | null>(null)
-  const [showManualInput, setShowManualInput] = useState(false)
-  const [manualUrl, setManualUrl] = useState("")
+export function ProductSearchForm({ value, onChange }: ProductSearchFormProps) {
+  const [inputValue, setInputValue] = useState(value.brandModel || value.pastedUrl || "")
   const [isOpen, setIsOpen] = useState(false)
+  const [showManualInput, setShowManualInput] = useState(false)
   
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const { toast } = useToast()
 
+  // Close dropdown if clicked outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -52,43 +51,39 @@ export function ProductSearchForm({ onSearch }: ProductSearchFormProps) {
     product.label.toLowerCase().includes(inputValue.toLowerCase())
   )
 
-  const handleSelect = (value: string, label: string) => {
-    setSelectedValue(value)
-    setInputValue(label) 
+  const handleSelect = (selectedValue: string, label: string) => {
+    setInputValue(label)
     setIsOpen(false)
     setShowManualInput(false)
-    setManualUrl("")
-  }
-
-  const handleSearch = () => {
-    if (selectedValue) {
-      onSearch(selectedValue)
-    } else if (showManualInput && manualUrl) {
-      onSearch(manualUrl)
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Invalid Product",
-        description: "Please select a valid product from the dropdown list or enter a URL.",
-      })
-    }
+    
+    // Pass the selection up to DealSearchBar's state
+    onChange({
+      ...value,
+      category: "electronics", 
+      subcategory: "smartphone",
+      brandModel: selectedValue,
+      pastedUrl: null
+    })
   }
 
   return (
     <div className="space-y-4 w-full">
       <div className="relative w-full" ref={dropdownRef}>
+        {/* Clean Input replacing the magnifying glass CommandInput */}
         <Input
           placeholder="Select product..."
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value)
             setIsOpen(true)
-            setSelectedValue(null)
+            // Reset parent state when typing fresh
+            onChange({ ...value, brandModel: null, pastedUrl: null })
           }}
           onFocus={() => setIsOpen(true)}
-          className="w-full bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-400 h-12 text-base"
+          className="w-full bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-400 h-11 text-base"
         />
 
+        {/* Absolute floating dropdown */}
         {isOpen && inputValue && (
           <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-slate-950 border border-slate-800 rounded-md shadow-2xl overflow-hidden">
             <Command className="w-full bg-transparent">
@@ -119,7 +114,7 @@ export function ProductSearchForm({ onSearch }: ProductSearchFormProps) {
                         <Check
                           className={cn(
                             "mr-3 h-4 w-4 text-emerald-400",
-                            selectedValue === product.value ? "opacity-100" : "opacity-0"
+                            value.brandModel === product.value ? "opacity-100" : "opacity-0"
                           )}
                         />
                         {product.label}
@@ -133,23 +128,23 @@ export function ProductSearchForm({ onSearch }: ProductSearchFormProps) {
         )}
       </div>
 
+      {/* Manual URL Input directly syncing to DealSearchBar state */}
       {showManualInput && (
         <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
           <Input
             placeholder="Paste Amazon/Flipkart checkout URL..."
-            value={manualUrl}
-            onChange={(e) => setManualUrl(e.target.value)}
-            className="w-full bg-slate-900 border-slate-800 text-slate-100 h-12"
+            value={value.pastedUrl || ""}
+            onChange={(e) => onChange({
+                ...value,
+                category: null,
+                subcategory: null,
+                brandModel: null,
+                pastedUrl: e.target.value
+            })}
+            className="w-full bg-slate-900 border-slate-800 text-slate-100 h-11"
           />
         </div>
       )}
-
-      <Button 
-        onClick={handleSearch} 
-        className="w-full h-12 bg-[#4ade80] text-emerald-950 hover:bg-[#22c55e] font-semibold text-base transition-colors"
-      >
-        Search & rank my cards
-      </Button>
     </div>
   )
 }
