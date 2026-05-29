@@ -1,4 +1,3 @@
-import { buildProductSerperQuery as buildProductSerperQueryFromRules } from "@/lib/search-category-rules"
 
 export type ProductSort = "best_card" | "cheapest"
 
@@ -32,14 +31,48 @@ export function defaultProductSearchParams(): ProductSearchParams {
 }
 
 export function buildProductSerperQuery(params: ProductSearchParams): string {
-  const query = `${params.category} ${params.subcategory} ${params.brandModel}`
-  return buildProductSerperQueryFromRules({ ...params, query })
+  if (params.pastedUrl) {
+    return params.pastedUrl
+  }
+
+  const query = `${params.category || ""} ${params.subcategory || ""} ${
+    params.brandModel || ""
+  }`.trim()
+
+  const techRegex =
+    /iphone|samsung|pixel|macbook|ipad|playstation|xbox|laptop|watch|airpods/i
+  if (techRegex.test(query)) {
+    return `${query} buy online price in india -case -cover -protector -glass -skin -cable -charger -refurbished -repair -used -site:pinterest.com -site:wikipedia.org -site:gsmarena.com`
+  }
+
+  return `${query} buy online price in india -used -refurbished`
 }
 
 export function buildProductReferenceUrl(params: ProductSearchParams): string {
-  if (params.pastedUrl?.trim()) return params.pastedUrl.trim()
+  if (params.pastedUrl?.trim()) {
+    const urlStr = params.pastedUrl.trim()
+    try {
+      const url = new URL(urlStr)
+      if (
+        url.hostname.includes("amazon.in") ||
+        url.hostname.includes("amazon.com")
+      ) {
+        url.searchParams.set("tag", "poolpay-21")
+        return url.toString()
+      }
+      if (url.hostname.includes("flipkart.com")) {
+        url.searchParams.set("affid", "poolpayHQ")
+        return url.toString()
+      }
+      return urlStr
+    } catch (e) {
+      return urlStr
+    }
+  }
   const q = encodeURIComponent(
-    `${params.category} ${params.subcategory} ${params.brandModel}`
+    `${params.category || ""} ${params.subcategory || ""} ${
+      params.brandModel || ""
+    }`.trim()
   )
   return `https://www.google.com/search?tbm=shop&q=${q}`
 }
@@ -63,12 +96,15 @@ export function validateProductSearch(
   options?: { requirePrice?: boolean }
 ): { ok: true } | { ok: false; message: string } {
   const { category, subcategory, brandModel } = params
+  const query = `${category || ""} ${subcategory || ""} ${
+    brandModel || ""
+  }`.trim()
   const url = params.pastedUrl?.trim() ?? ""
 
-  if (!category || !subcategory || !brandModel) {
+  if (!url && !query) {
     return {
       ok: false,
-      message: "Please select a category, subcategory, and brand/model to search.",
+      message: "Please provide a product to search for, or paste a URL.",
     }
   }
 
