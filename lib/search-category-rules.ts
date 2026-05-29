@@ -201,3 +201,25 @@ export function priceBoundsForCategory(
 export function categoryRules(category: DealSearchCategory): CategoryRuleSet {
   return CATEGORY_RULES[category]
 }
+
+export function buildFlightSerperQuery(params: any): string {
+  if (!params.query) return ""
+  const baseQuery = params.query.toLowerCase().trim()
+  
+  // Force Serper to look for actual ticketing engines, not travel blogs
+  const bookingIntent = "flight booking tickets price online"
+  const negativeKeywords = "-blog -news -article -guide -tips -forum -pinterest -wikipedia"
+  
+  return `${baseQuery} ${bookingIntent} ${negativeKeywords}`
+}
+
+export function buildHotelSerperQuery(params: any): string {
+  if (!params.query) return ""
+  const baseQuery = params.query.toLowerCase().trim()
+  
+  // Isolate hotel booking engines and kill review sites
+  const bookingIntent = "hotel booking price per night room"
+  const negativeKeywords = "-review -blog -top -best -guide -tripadvisor -forum"
+  
+  return `${baseQuery} ${bookingIntent} ${negativeKeywords}`
+}
